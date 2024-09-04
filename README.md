@@ -1,2 +1,2 @@
 # FHC-Core-ElectronicOnboarding
-Electronic Onboarding
+Extension for electronic onboarding process
