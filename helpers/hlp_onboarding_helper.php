@@ -17,11 +17,13 @@ function generateCodeVerifier()
 	return base64_urlencode(substr( str_shuffle( $chars ), 0, rand(43, 128)));
 }
 
+// create hash
 function computeCodeChallangeHash($codeVerifier)
 {
 	return base64_urlencode(hash('sha256', $codeVerifier, true));
 }
 
+// base 64 url encode
 function base64_urlencode($value) {
 	return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
 }

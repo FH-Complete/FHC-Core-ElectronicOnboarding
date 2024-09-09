@@ -12,14 +12,11 @@ class OnboardingClientLib
 	const HTTP_PUT_METHOD = 'PUT'; // http merge method name
 	const URI_TEMPLATE = '%s://%s'; // URI format
 
-	const AUTHORIZATION_HEADER_NAME = 'Authorization'; // accept header name
-	const AUTHORIZATION_HEADER_PREFIX = 'Bearer'; // accept header name
-	const ACCEPT_HEADER_VALUE = 'application/json'; // accept header value
 	const UUID_HEADER_NAME = 'eosp-uuid'; // accept header value
+	const CONTENT_TYPE_HEADER_NAME = 'Content-Type'; // content type header name
 
-	// Configs parameters names
-	const ACTIVE_CONNECTION = 'active_connection';
-	const CONNECTIONS = 'onboarding_connections';
+	const JSON_CONTENT_TYPE = 'application/json'; // content type of passed data
+	const TEXT_CONTENT_TYPE = 'text/plain'; // content type of passed data
 
 	// HTTP codes
 	const HTTP_OK = 200; // HTTP success code
@@ -37,6 +34,10 @@ class OnboardingClientLib
 	const MISSING_REQUIRED_PARAMETERS =	'ERR0004';
 	const WRONG_WS_PARAMETERS =	'ERR0005';
 
+	// Configs parameters names
+	const ACTIVE_CONNECTION = 'active_connection';
+	const CONNECTIONS = 'onboarding_connections';
+
 	// Connection parameters names
 	const PROTOCOL = 'protocol';
 	const HOST = 'host';
@@ -49,15 +50,16 @@ class OnboardingClientLib
 	const CERTIFICATE_KEY_FILE_PATH = 'certificate_key_file_path';
 
 	private $_connectionsArray;	// contains the connection parameters configuration array
-	private $_cert_file_path;	// contains the connection parameters configuration array
-	private $_key_file_path;	// contains the connection parameters configuration array
+	private $_cert_file_path;	// path to authentification certificate
+	private $_key_file_path;	// path to authentification certificate (private key)
 
 	private $_wsFunction;		// path to the webservice
-	private $_registrationId;		// path to the webservice
+	private $_registrationId;		// registration id, part of uri for almost every call
 
 	private $_httpMethod;		// http method used to call this server
 	private $_uriParametersArray;	// contains the parameters to give to the remote web service which are part of the url
-	private $_callParametersArray;	// contains the parameters to give to the remote web service
+	private $_callParameters;	// contains the parameters to give to the remote web service
+	private $_contentType;	// type of data sent to webservice
 
 	private $_error;		// true if an error occurred
 	private $_errorMessage;		// contains the error message
@@ -92,8 +94,14 @@ class OnboardingClientLib
 	/**
 	 * Performs a call to a remote web service
 	 */
-	public function call($registrationId, $wsFunction, $httpMethod = self::HTTP_GET_METHOD, $uriParametersArray = array(), $callParametersArray = array())
-	{
+	public function call(
+		$registrationId,
+		$wsFunction,
+		$httpMethod = self::HTTP_GET_METHOD,
+		$uriParametersArray = array(),
+		$callParameters = array(),
+		$contentType = self::JSON_CONTENT_TYPE
+	) {
 		// Checks if the api set name is valid
 		if (($registrationId == null || trim($registrationId) == '') && ($wsFunction == null || trim($wsFunction) == ''))
 		{
@@ -116,6 +124,17 @@ class OnboardingClientLib
 			$this->_error(self::WRONG_WS_PARAMETERS, 'Have you ever heard about HTTP methods?');
 		}
 
+		// Checks that the content type is valid
+		if ($contentType != null
+		&& ($contentType == self::JSON_CONTENT_TYPE || $contentType == self::TEXT_CONTENT_TYPE))
+		{
+			$this->_contentType = $contentType;
+		}
+		else
+		{
+			$this->_error(self::WRONG_WS_PARAMETERS, 'Invalid content type');
+		}
+
 		// Checks that the webservice uri parameters are present in an array
 		if (is_array($uriParametersArray))
 		{
@@ -126,10 +145,11 @@ class OnboardingClientLib
 			$this->_error(self::WRONG_WS_PARAMETERS, 'Are those uri parameters?');
 		}
 
-		// Checks that the webservice parameters are present in an array
-		if (is_array($callParametersArray))
+		// Checks that the webservice parameters are present and correct
+		if ((is_array($callParameters) && $this->_contentType == self::JSON_CONTENT_TYPE)
+		|| (is_string($callParameters) && $this->_contentType == self::TEXT_CONTENT_TYPE))
 		{
-			$this->_callParametersArray = $callParametersArray;
+			$this->_callParameters = $callParameters;
 		}
 		else
 		{
@@ -213,7 +233,8 @@ class OnboardingClientLib
 		$this->_wsFunction = null;
 		$this->_httpMethod = null;
 		$this->_uriParametersArray = array();
-		$this->_callParametersArray = array();
+		$this->_callParameters = null;
+		$this->_contentType = null;
 		$this->_error = false;
 		$this->_errorMessage = '';
 		$this->_hasData = false;
@@ -237,7 +258,8 @@ class OnboardingClientLib
 		$this->_wsFunction = null;
 		$this->_httpMethod = null;
 		$this->_uriParametersArray = array();
-		$this->_callParametersArray = array();
+		$this->_callParameters = null;
+		$this->_contentType = null;
 		$this->_error = false;
 		$this->_errorMessage = '';
 		$this->_hasData = false;
@@ -380,8 +402,8 @@ class OnboardingClientLib
 		return \Httpful\Request::post($uri)
 			->authenticateWithCert($this->_cert_file_path, $this->_key_file_path)
 			->addHeader(self::UUID_HEADER_NAME, generateUuidV4())
-			//->body($this->_callParametersArray) // parameters in body
-			->sendsJson() // content type json
+			->addHeader(self::CONTENT_TYPE_HEADER_NAME, $this->_contentType)
+			//->body($this->_callParameters) // parameters in body
 			->send();
 	}
 
@@ -394,8 +416,8 @@ class OnboardingClientLib
 			->authenticateWithCert($this->_cert_file_path, $this->_key_file_path)
 			->expectsJson() // dangerous expectations
 			->addHeader(self::UUID_HEADER_NAME, generateUuidV4())
-			->body($this->_callParametersArray) // parameters in body
-			->sendsJson() // content type json
+			->addHeader(self::CONTENT_TYPE_HEADER_NAME, $this->_contentType)
+			->body($this->_callParameters) // parameters in body
 			->send();
 	}
 

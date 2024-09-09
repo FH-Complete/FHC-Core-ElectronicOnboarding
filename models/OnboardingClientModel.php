@@ -26,10 +26,21 @@ abstract class OnboardingClientModel extends CI_Model
 	/**
 	 * Generic Onboarding webservice call
 	 */
-	protected function _call($httpMethod, $uriParametersArray = array(), $callParametersArray = array())
-	{
+	protected function _call(
+		$httpMethod,
+		$uriParametersArray = array(),
+		$callParametersArray = array(),
+		$contentType = OnboardingClientLib::JSON_CONTENT_TYPE
+	) {
 		// Call the Onboarding webservice with the given parameters
-		$wsResult = $this->onboardingclientlib->call($this->_registrationId, $this->_wsFunction, $httpMethod, $uriParametersArray, $callParametersArray);
+		$wsResult = $this->onboardingclientlib->call(
+			$this->_registrationId,
+			$this->_wsFunction,
+			$httpMethod,
+			$uriParametersArray,
+			$callParametersArray,
+			$contentType
+		);
 
 		// If an error occurred return it
 		if ($this->onboardingclientlib->isError())

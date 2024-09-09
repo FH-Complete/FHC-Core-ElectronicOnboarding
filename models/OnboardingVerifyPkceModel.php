@@ -23,13 +23,14 @@ class OnboardingVerifyPkceModel extends OnboardingClientModel
 	/**
 	 * Verifies pkce token
 	 */
-	public function verifyPkce($registrationId, $pkce)
+	public function verifyPkce($registrationId, $pkceVerifier)
 	{
 		$this->_registrationId = $registrationId;
 		return $this->_call(
 			OnboardingClientLib::HTTP_PUT_METHOD,
-			null,
-			array($pkce)
+			array(),
+			$pkceVerifier,
+			OnboardingClientLib::TEXT_CONTENT_TYPE
 		);
 	}
 }
