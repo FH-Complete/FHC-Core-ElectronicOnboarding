@@ -15,13 +15,16 @@ class OnboardingRegistrierungLib
 	const SESSION_LOGIN_VALUE = 'onboarding_application_tool_session_login_value';
 	const SESSION_PERSON_ID_KEY = 'onboarding_application_tool_session_person_id_key';
 	const APPLICATION_TOOL_PATH = 'onboarding_application_tool_path';
+	const VBPK_MAPPINGS = 'onboarding_vbpk_type_mappings';
 
 	// session key names
 	const SESSION_PKCE_VERIFIER = 'onboarding/pkce_verifier';
+	const SESSION_VERIFIED_REGISTRATION_ID = 'onboarding/verified_registration_id';
 
 	// other constant values
 	const PKCE_STATUS_VERIFIZIERT = 'VERIFIZIERT';
 	const ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP = 'eobRegistrierungsId';
+	const EMAIL_KONTAKTTYP = 'email';
 	const INSERT_VON = 'Onboarding';
 
 	private $_be = '';
@@ -40,6 +43,7 @@ class OnboardingRegistrierungLib
 		$this->_ci->load->helper('extensions/FHC-Core-ElectronicOnboarding/hlp_onboarding_helper');
 
 		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingClientLib');
+		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingAkteLib', null, 'OnboardingAkteLib');
 
 		$activeConnectionName = $this->_ci->config->item(OnboardingClientLib::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(OnboardingClientLib::CONNECTIONS);
@@ -50,7 +54,7 @@ class OnboardingRegistrierungLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
-	
+
 	public function getRegistrierungUrl()
 	{
 		// Loads models
@@ -79,7 +83,7 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 * 
+	 *
 	 * @param
 	 * @return object success or error
 	 */
@@ -95,7 +99,7 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 * 
+	 *
 	 * @param
 	 * @return object success or error
 	 */
@@ -120,30 +124,60 @@ class OnboardingRegistrierungLib
 
 		return error("Registration failed");
 
-		//unset($_SESSION[self::SESSION_PKCE_VERIFIER]);
+	}
+
+	public function storeVerifiedRegistrationId($verifiedRegistrationId)
+	{
+		if (session_status() === PHP_SESSION_NONE) session_start();
+
+		if (isEmptyString($verifiedRegistrationId)) return error('Verified registration Id empty');
+
+		$_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID] = $verifiedRegistrationId;
+
+		return success();
+	}
+
+	public function getVerifiedRegistrationId()
+	{
+		if (session_status() === PHP_SESSION_NONE) session_start();
+
+		return $_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID] ?? null;
 	}
 
 	/**
-	 * 
+	 *
 	 * @param
 	 * @return object success or error
 	 */
-	public function saveRegisteredPersonData($registeredPersonData)
+	public function saveRegisteredPersonData($email)
 	{
+		if (!isset($_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID])) return error("Verified registration Id not saved");
+
+		$registrationId = $_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID];
+
 		// Loads models
 		$this->_ci->load->model('person/Kennzeichen_model', 'KennzeichenModel');
 		$this->_ci->load->model('person/Person_model', 'PersonModel');
 		$this->_ci->load->model('person/Adresse_model', 'AdresseModel');
+		$this->_ci->load->model('person/Kontakt_model', 'KontaktModel');
+		$this->_ci->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingAbfragenModel', 'AbfragenModel');
 
 		$this->_ci->load->library('PersonLogLib', null, 'PersonLogLib');
 
-		if (!isset($registeredPersonData->registrierung->id)) return error("Invalid registration data");
+		// get onboarding data of the registered person
+		$abfragenRes = $this->_ci->AbfragenModel->abfragen($registrationId);
 
-		$registrationId = $registeredPersonData->registrierung->id;
+		if (isError($abfragenRes)) return $abfragenRes;
+
+		if (!hasData($abfragenRes)) return error("No registration data found");
+
+		$registeredPersonData = getData($abfragenRes);
+
+		if (!isset($registeredPersonData->registrierung) || !isset($registeredPersonData->person))
+			return error("Invalid registration data");
 
 		$person_id = null;
 		$errors = [];
-
 
 		// is the registration id already saved, i.e. person already saved?
 		$this->_ci->KennzeichenModel->addSelect('person_id');
@@ -181,16 +215,16 @@ class OnboardingRegistrierungLib
 				$this->_ci->PersonLogLib->log(
 					$person_id,
 					'Processstate',
-					array('name'=>'New registration','message'=>'Person registered via electronic onboarding'),
+					array('name'=>'New registration','message'=>'New person registered via electronic onboarding'),
 					'bewerbung',
 					'core',
 					null,
 					'online'
 				);
-			
+
 				// map to address
 				$adresse = $this->_mapOnboardingAdresse($registeredPersonData);
-				
+
 				if (!isEmptyArray($adresse))
 				{
 					// save adresse
@@ -199,6 +233,54 @@ class OnboardingRegistrierungLib
 					);
 
 					if (isError($adresseRes)) $errors[] = getError($adresseRes);
+				}
+
+				if (isset($email))
+				{
+					// map to email Kontakt
+					$emailKontakt = $this->_mapEmail($email);
+
+					if (!isEmptyArray($emailKontakt))
+					{
+						// save kontakt
+						$kontaktRes = $this->_ci->KontaktModel->insert(
+							array_merge(
+								$emailKontakt,
+								['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON]
+							)
+						);
+
+						if (isError($kontaktRes)) $errors[] = getError($kontaktRes);
+					}
+				}
+
+				// map vBpks
+				$vBpks = $this->_mapOnboardingVbpk($registeredPersonData);
+
+				if (!isEmptyArray($vBpks))
+				{
+					foreach ($vBpks as $vBpk)
+					{
+						// save vBpk
+						$vBpkRes = $this->_ci->KennzeichenModel->insert(
+							array_merge(
+								['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON],
+								$vBpk
+							)
+						);
+
+						if (isError($vBpkRes)) $errors[] = getError($vBpkRes);
+					}
+				}
+
+				$akte = $this->_mapOnboardingBild($registeredPersonData);
+
+				if (!isEmptyArray($akte))
+				{
+					// save picture as Akte
+					$akteRes = $this->_ci->OnboardingAkteLib->saveBigImage($person_id, $akte);
+
+					if (isError($akteRes)) $errors[] = getError($akteRes);
 				}
 
 				// save registration id as kennzeichen
@@ -227,9 +309,8 @@ class OnboardingRegistrierungLib
 		// Check if everything went ok during the transaction
 		if ($this->_ci->db->trans_status() === false || !isEmptyArray($errors))
 		{
-			$this->addInfoOutput("rolling back...");
 			$this->_ci->db->trans_rollback();
-			return isEmptyArray($errors) ? error("Error when saving person data") : error(errors(implode('; ', $errors)));
+			return isEmptyArray($errors) ? error("rolling back... Error when saving person data") : error(implode('; ', $errors));
 		}
 		else
 		{
@@ -239,7 +320,7 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 * 
+	 *
 	 * @param
 	 * @return object success or error
 	 */
@@ -252,12 +333,15 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function redirectToApplicationTool()
 	{
 		redirect(base_url($this->_ci->config->item(self::APPLICATION_TOOL_PATH)));
 	}
+
+	// --------------------------------------------------------------------------------------------
+	// Private methods
 
 	private function _mapOnboardingPerson($onboardingPersonData)
 	{
@@ -270,6 +354,9 @@ class OnboardingRegistrierungLib
 			'gebdatum' => $onboardingPerson->geburtsdatum,
 			'geschlecht' => $this->_mapOnboardingGeschlecht($onboardingPerson->geschlecht),
 			'bpk' => $onboardingPerson->bpk,
+			'foto' => isset($onboardingPersonData->personenbild->bilddaten)
+				? $this->_ci->OnboardingAkteLib->resizeBase64ImageSmall($onboardingPersonData->personenbild->bilddaten)
+				: null,
 			'aktiv' => true
 		];
 	}
@@ -283,7 +370,31 @@ class OnboardingRegistrierungLib
 		];
 		return $geschlechtMappings[$onboardingGeschlecht];
 	}
-	
+
+	private function _mapOnboardingVbpk($onboardingPersonData)
+	{
+		$resVbpks = [];
+		if (!isset($onboardingPersonData->person->wbpkListe)) return [];
+
+		$vBpks = $onboardingPersonData->person->wbpkListe;
+
+		foreach ($vBpks as $vBpk)
+		{
+			$arr = explode(':', $vBpk);
+
+			if (count($arr) != 2) continue;
+
+			$vbpkMappings = $this->_ci->config->item(self::VBPK_MAPPINGS);
+
+			if (isset($vbpkMappings[$arr[0]]))
+			{
+				$resVbpks[] = ['kennzeichentyp_kurzbz' => $vbpkMappings[$arr[0]], 'inhalt' => $arr[1], 'aktiv' => true];
+			}
+		}
+
+		return $resVbpks;
+	}
+
 	private function _mapOnboardingAdresse($onboardingPersonData)
 	{
 		if (!isset($onboardingPersonData->person->meldeadresse)) return [];
@@ -296,13 +407,41 @@ class OnboardingRegistrierungLib
 
 		return [
 			'strasse' => $strasse,
-			'plz' => $onboardingAddress->gemeindekennziffer,
+			'plz' => $onboardingAddress->postleitzahl,
 			'ort' => $onboardingAddress->ortschaft,
 			'gemeinde' => $onboardingAddress->gemeindebezeichnung,
 			'nation' => 'A',
 			'typ' => 'h',
 			'heimatadresse' => true,
 			'zustelladresse' => true,
+		];
+	}
+
+	private function _mapOnboardingBild($onboardingPersonData)
+	{
+		if (!isset($onboardingPersonData->personenbild)) return [];
+
+		$onboardingBild = $onboardingPersonData->personenbild;
+		$mimetype = $this->_ci->OnboardingAkteLib->getMimeTypeFromFile(base64_decode($onboardingBild->bilddaten));
+		$fileEndingArr = explode('/', $mimetype);
+
+		return [
+			'titel' => isset($fileEndingArr[1]) ? '.'.explode('/', $mimetype)[1] : '', // file ending
+			'bezeichnung' => 'Lichtbild gross',
+			'mimetype' => $mimetype,
+			'dokument_kurzbz' => 'Lichtbil',
+			'dokument_bezeichnung' => 'Lichtbild',
+			'erstelltam' => $onboardingBild->datum,
+			'file_content' => $onboardingBild->bilddaten
+		];
+	}
+
+	private function _mapEmail($email)
+	{
+		return [
+			'kontakt' => $email,
+			'kontakttyp' => self::EMAIL_KONTAKTTYP,
+			'zustellung' => true
 		];
 	}
 }
