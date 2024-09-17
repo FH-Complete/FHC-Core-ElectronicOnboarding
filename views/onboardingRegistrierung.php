@@ -21,7 +21,11 @@
 						<tr>
 							<?php if (isset($onboardingData->personenbild->bilddaten)): ?>
 							<td rowspan="3" class="text-center">
-								<img src="data:image/gif;base64,<?php echo $onboardingData->personenbild->bilddaten?>"/>
+								<img
+									src="data:image/gif;base64,<?php echo $onboardingData->personenbild->bilddaten?>"
+									class="img-fluid"
+									style="max-width: 400px; max-height: 400px"
+								/>
 							</td>
 							<?php endif; ?>
 							<td class="fw-bold">Vorname</td>
@@ -49,8 +53,6 @@
 			<div class="row">
 				<div class="col-8">
 					<input type="text" class="form-control" name="email" value="<?php echo set_value('email'); ?>" placeholder="name@example.com"/>
-					<input type="hidden" name="onboardingData" value="<?php echo json_encode($onboardingData);?>">
-
 				</div>
 				<div class="col-4">
 					<button type="submit" class="btn btn-primary">Login abschließen</button>

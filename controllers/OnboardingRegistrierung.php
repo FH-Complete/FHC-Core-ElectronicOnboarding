@@ -15,6 +15,7 @@ class OnboardingRegistrierung extends FHC_Controller
 		parent::__construct();
 
 		$this->load->model('person/Kontakt_model', 'KontaktModel');
+		$this->load->model('person/Person_model', 'PersonModel');
 
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierungLib', null, 'OnboardingRegistrierungLib');
 	}
@@ -71,7 +72,19 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		if (isError($kennzeichenRes)) show_error(getError($kennzeichenRes));
 
-		if (hasData($kennzeichenRes))
+		// is the bpk already saved for a person?
+		$personRes = null;
+		if (isset($onboardingData->person->bpk))
+		{
+			$this->PersonModel->addSelect('1');
+			$this->PersonModel->addOrder('person_id', 'DESC');
+			$this->PersonModel->addLimit(1);
+			$personRes = $this->PersonModel->loadWhere(['bpk' => $onboardingData->person->bpk]);
+
+			if (isError($personRes)) show_error(getError($personRes));
+		}
+
+		if (hasData($kennzeichenRes) || hasData($personRes))
 		{
 			// person already registered -> proceed to application tool immediately
 			$this->_registerOnboarding();
