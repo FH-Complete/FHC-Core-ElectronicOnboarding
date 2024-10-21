@@ -9,56 +9,87 @@
 	$this->load->view('templates/FHC-Header', $includesArray);
 ?>
 <div id="main">
-	<div id="content">
+	<div class="container">
+		<br>
 		<header>
 			<h1 class="h2 fhc-hr">Login abschließen für</h1>
 		</header>
 		<br>
 		<div class="row">
-			<div class="col-9">
-				<table class="table table-bordered">
-					<tbody>
-						<tr>
+			<div class="col-lg-11">
+				<div class="card mb-4">
+					<div class="card-body">
+						<div class="row">
 							<?php if (isset($onboardingData->personenbild->bilddaten)): ?>
-							<td rowspan="3" class="text-center">
+							<div class="col-lg-3 text-center mb-3 mb-md-0">
 								<img
 									src="data:image/gif;base64,<?php echo $onboardingData->personenbild->bilddaten?>"
-									class="img-fluid"
-									style="max-width: 400px; max-height: 400px"
-								/>
-							</td>
+									class="img-fluid rounded-3"
+									alt="photo"
+									style="max-width: 250px; max-height: 250px"/>
+							</div>
 							<?php endif; ?>
-							<td class="fw-bold">Vorname</td>
-							<td><?php echo $onboardingData->person->vorname; ?></td>
-						</tr>
-						<tr>
-							<td class="fw-bold">Nachname</td>
-							<td><?php echo $onboardingData->person->familienname; ?></td>
-						</tr>
-						<tr>
-							<td class="fw-bold">Geburtsdatum</td>
-							<td><?php echo date_format(date_create($onboardingData->person->geburtsdatum), 'd.m.Y'); ?></td>
-						</tr>
-					</tbody>
-				</table>
+							<div class="col-lg-<?php echo (isset($onboardingData->personenbild->bilddaten) ? 9 : 12) ?>">
+								<div class="row">
+									<div class="col-sm-3">
+										<p class="mb-0">Vorname</p>
+									</div>
+									<div class="col-sm-9">
+										<p class="text-muted mb-0"><?php echo $onboardingData->person->vorname; ?></p>
+									</div>
+								</div>
+								<hr>
+								<div class="row">
+									<div class="col-sm-3">
+										<p class="mb-0">Nachname</p>
+									</div>
+									<div class="col-sm-9">
+										<p class="text-muted mb-0"><?php echo $onboardingData->person->familienname; ?></p>
+									</div>
+								</div>
+								<hr>
+								<div class="row">
+									<div class="col-sm-3">
+										<p class="mb-0">Geburtsdatum</p>
+									</div>
+									<div class="col-sm-9">
+										<p class="text-muted mb-0"><?php echo date_format(date_create($onboardingData->person->geburtsdatum), 'd.m.Y'); ?></p>
+									</div>
+								</div>
+								<hr>
+								<form
+								action="<?php echo site_url("extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierung/registerNewOnboarding")?>"
+								class="form-inline"
+								method="POST">
+									<input type="hidden" name="registrationId" value="<?php echo $registrationId ?>"/>
+									<label class="form-label" for="verwendung_code">E-Mail Adresse</label>
+									<div class="row">
+										<div class="col-sm-12 input-group">
+											<input
+												type="text"
+												class="form-control"
+												name="email"
+												value="<?php echo set_value('email', $email); ?>"
+												placeholder="name@example.com"
+												aria-label="Email"
+												aria-describedby="email-button"/>
+											<button type="submit" id="email-button" class="btn btn-primary">Login abschließen</button>
+										</div>
+									</div>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
-		<br>
-		<span class="text-danger"><?php echo validation_errors(); ?></span>
-		<form
-		action="<?php echo site_url("extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierung/registerNewOnboarding")?>"
-		class="form-inline"
-		method="POST">
-			<label class="form-label" for="verwendung_code">E-Mail Adresse</label>
-			<div class="row">
-				<div class="col-8">
-					<input type="text" class="form-control" name="email" value="<?php echo set_value('email'); ?>" placeholder="name@example.com"/>
-				</div>
-				<div class="col-4">
-					<button type="submit" class="btn btn-primary">Login abschließen</button>
+		<div class="row">
+			<div class="col-lg-11">
+				<div class="text-danger text-center">
+					<b><?php echo validation_errors(); ?></b>
 				</div>
 			</div>
-		</form>
+		</div>
 	</div>
 </div>
 

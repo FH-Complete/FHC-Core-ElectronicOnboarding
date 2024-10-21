@@ -15,7 +15,6 @@ class OnboardingRegistrierungLib
 	const SESSION_LOGIN_VALUE = 'onboarding_application_tool_session_login_value';
 	const SESSION_PERSON_ID_KEY = 'onboarding_application_tool_session_person_id_key';
 	const APPLICATION_TOOL_PATH = 'onboarding_application_tool_path';
-	const VBPK_MAPPINGS = 'onboarding_vbpk_type_mappings';
 
 	// session key names
 	const SESSION_PKCE_VERIFIER = 'onboarding/pkce_verifier';
@@ -25,8 +24,11 @@ class OnboardingRegistrierungLib
 	const PKCE_STATUS_VERIFIZIERT = 'VERIFIZIERT';
 	const ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP = 'eobRegistrierungsId';
 	const EMAIL_KONTAKTTYP = 'email';
+	const EMAIL_UNVERIFIZIERT_KONTAKTTYP = 'email_unverifiziert';
+	const ONBOARDING_APP_NAME = 'onboarding';
 	const INSERT_VON = 'Onboarding';
 
+	private $_ci;
 	private $_be = '';
 	private $_pkceCodeVerifier = '';
 
@@ -43,7 +45,13 @@ class OnboardingRegistrierungLib
 		$this->_ci->load->helper('extensions/FHC-Core-ElectronicOnboarding/hlp_onboarding_helper');
 
 		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingClientLib');
+		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingMappingLib', null, 'OnboardingMappingLib');
 		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingAkteLib', null, 'OnboardingAkteLib');
+
+		$this->_ci->load->model('person/Person_model', 'PersonModel');
+		$this->_ci->load->model('person/Kontakt_model', 'KontaktModel');
+		$this->_ci->load->model('person/Kontaktverifikation_model', 'KontaktverifikationModel');
+		$this->_ci->load->model('person/Kennzeichen_model', 'KennzeichenModel');
 
 		$activeConnectionName = $this->_ci->config->item(OnboardingClientLib::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(OnboardingClientLib::CONNECTIONS);
@@ -119,8 +127,7 @@ class OnboardingRegistrierungLib
 		$pkceData = getData($pkceRes);
 
 		// read result and only verified if data verified in result
-		if (isset($pkceData->registrierung->status) && $pkceData->registrierung->status == self::PKCE_STATUS_VERIFIZIERT)
-			return success($pkceData);
+		if ($this->checkOnboardingTrackDataVerified($pkceData)) return success($pkceData);
 
 		return error("Registration failed");
 
@@ -145,15 +152,105 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
+	 * Checks if onboarding track data is valid and verified
+	 * @param
+	 * @return object success or error
+	 */
+	public function checkOnboardingTrackDataVerified($onboardingData)
+	{
+		return (isset($onboardingData->registrierung)
+			&& isset($onboardingData->person)
+			&& isset($onboardingData->registrierung->status)
+			&& $onboardingData->registrierung->status === self::PKCE_STATUS_VERIFIZIERT);
+	}
+
+	/**
+	* Checks if a registered (and verified) person exists in fhcomplete for an Onboarding track
+	* @param registrationId
+	* @param bpk
+	* @return object success containing array with email and its verification status or error
+	*/
+	public function checkPersonRegistered($registrationId, $bpk)
+	{
+		$email = null;
+		$verified = false;
+		$person_id = null;
+
+		// is the registration id already saved for a person?
+		$kennzeichenRes = $this->_ci->KennzeichenModel->loadWhere(
+			['kennzeichentyp_kurzbz' => self::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP, 'inhalt' => $registrationId]
+		);
+
+		if (isError($kennzeichenRes)) show_error(getError($kennzeichenRes));
+
+		// is the bpk already saved for a person?
+		$bpkRes = null;
+		if (isset($bpk))
+		{
+			$this->_ci->PersonModel->addSelect('person_id');
+			$this->_ci->PersonModel->addOrder('person_id', 'DESC');
+			$this->_ci->PersonModel->addLimit(1);
+			$bpkRes = $this->_ci->PersonModel->loadWhere(['bpk' => $bpk]);
+
+			if (isError($bpkRes)) return $bpkRes;
+		}
+
+		if (hasData($kennzeichenRes))
+		{
+			$person_id = getData($kennzeichenRes)[0]->person_id;
+		}
+		elseif (hasData($bpkRes))
+		{
+			$person_id = getData($bpkRes)[0]->person_id;
+		}
+
+		$emailRes = null;
+		$unverifiedEmailRes = null;
+		if (isset($person_id))
+		{
+			// is there a verified email for a person?
+			$this->_ci->KontaktModel->addSelect('kontakt');
+			$this->_ci->KontaktModel->addOrder('kontakt_id', 'DESC');
+			$this->_ci->KontaktModel->addLimit(1);
+			$emailRes = $this->_ci->KontaktModel->loadWhere(
+				['person_id' => $person_id, 'kontakttyp' => self::EMAIL_KONTAKTTYP]
+			);
+
+			if (isError($emailRes)) return $emailRes;
+
+			if (hasData($emailRes))
+			{
+				$verified = true;
+				$email = getData($emailRes)[0]->kontakt;
+			}
+			else
+			{
+				// is there a unverified email for a person?
+				$this->_ci->KontaktModel->addSelect('kontakt');
+				$this->_ci->KontaktModel->addOrder('kontakt_id', 'DESC');
+				$this->_ci->KontaktModel->addLimit(1);
+				$unverifiedEmailRes = $this->_ci->KontaktModel->loadWhere(
+					['person_id' => $person_id, 'kontakttyp' => self::EMAIL_UNVERIFIZIERT_KONTAKTTYP]
+				);
+
+				if (isError($unverifiedEmailRes)) return $unverifiedEmailRes;
+
+				if (hasData($unverifiedEmailRes)) $email = getData($unverifiedEmailRes)[0]->kontakt;
+			}
+		}
+
+		return success(['email'=> $email, 'verified' => $verified, 'person_id' => $person_id]);
+	}
+
+	/**
 	 *
 	 * @param
 	 * @return object success or error
 	 */
-	public function saveRegisteredPersonData($email)
+	public function saveRegisteredPersonData($email, $registrationId)
 	{
-		if (!isset($_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID])) return error("Verified registration Id not saved");
-
-		$registrationId = $_SESSION[self::SESSION_VERIFIED_REGISTRATION_ID];
+		if (!isset($email) || isEmptyString($email)) return error("E-Mail missing");
+		if (!isset($registrationId) || isEmptyString($registrationId)) return error("Registration Id missing");
 
 		// Loads models
 		$this->_ci->load->model('person/Kennzeichen_model', 'KennzeichenModel');
@@ -174,10 +271,10 @@ class OnboardingRegistrierungLib
 
 		$registeredPersonData = getData($abfragenRes);
 
-		if (!isset($registeredPersonData->registrierung) || !isset($registeredPersonData->person))
-			return error("Invalid registration data");
+		if (!$this->checkOnboardingTrackDataVerified($registeredPersonData)) return error("Invalid registration data");
 
 		$person_id = null;
+		$verifikation_code = null;
 		$errors = [];
 
 		// is the registration id already saved, i.e. person already registered?
@@ -188,28 +285,56 @@ class OnboardingRegistrierungLib
 
 		if (isError($kennzeichenRes)) return $kennzeichenRes;
 
-		// if person already registered, return the person Id
-		if (hasData($kennzeichenRes)) return success(getData($kennzeichenRes)[0]->person_id);
+		// if person already registered,
+		if (hasData($kennzeichenRes))
+		{
+			$person_id = getData($kennzeichenRes)[0]->person_id;
+
+			// get the token
+			$this->_ci->KontaktModel->addSelect('kontakt_id, kontakt_verifikation_id');
+			$this->_ci->KontaktModel->addJoin('public.tbl_kontakt_verifikation', 'kontakt_id');
+			$this->_ci->KontaktModel->addOrder('erstelldatum', 'DESC');
+			$this->_ci->KontaktModel->addLimit(1);
+			$kontaktRes = $this->_ci->KontaktModel->loadWhere(['person_id' => $person_id, 'kontakttyp' => self::EMAIL_UNVERIFIZIERT_KONTAKTTYP]);
+
+			if (isError($kontaktRes)) return $kontaktRes;
+
+			// renew the token
+			if (hasData($kontaktRes))
+			{
+				$verifikation_code = generateVerificationCode();
+				$renewRes = $this->_ci->KontaktverifikationModel->update(
+					['kontakt_verifikation_id' => getData($kontaktRes)[0]->kontakt_verifikation_id],
+					['verifikation_code' => $verifikation_code, 'erstelldatum' => date('Y-m-d H:i:s')]
+				);
+
+				if (isError($renewRes)) return $renewRes;
+			}
+
+			// return the person data
+			return success(['person_id' => $person_id, 'verifikation_code' => $verifikation_code]);
+		}
+
 
 		// is the bpk already saved, i.e. person already has an account at native system?
-		if (isset($registeredPersonData->person->bpk))
-		{
-			$this->_ci->PersonModel->addSelect('person_id');
-			$this->_ci->PersonModel->addOrder('person_id', 'DESC');
-			$this->_ci->PersonModel->addLimit(1);
-			$personRes = $this->_ci->PersonModel->loadWhere(['bpk' => $registeredPersonData->person->bpk]);
+		//~ if (isset($registeredPersonData->person->bpk))
+		//~ {
+			//~ $this->_ci->PersonModel->addSelect('person_id');
+			//~ $this->_ci->PersonModel->addOrder('person_id', 'DESC');
+			//~ $this->_ci->PersonModel->addLimit(1);
+			//~ $personRes = $this->_ci->PersonModel->loadWhere(['bpk' => $registeredPersonData->person->bpk]);
 
-			if (isError($personRes)) return $personRes;
+			//~ if (isError($personRes)) return $personRes;
 
-			// if person already saved,
-			if (hasData($personRes))
-			{
-				$person_id = getData($personRes)[0]->person_id;
+			//~ // if person already saved,
+			//~ if (hasData($personRes))
+			//~ {
+				//~ $person_id = getData($personRes)[0]->person_id;
 
-				// save person as registered (with registration Id)
-				return $this->_saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
-			}
-		}
+				//~ // save person as registered (with registration Id)
+				//~ return $this->_saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
+			//~ }
+		//~ }
 
 		// if no registration Id yet (not registered):
 
@@ -217,7 +342,7 @@ class OnboardingRegistrierungLib
 		$this->_ci->db->trans_begin();
 
 		// map to person so it can be saved in db
-		$person = $this->_mapOnboardingPerson($registeredPersonData);
+		$person = $this->_ci->OnboardingMappingLib->mapOnboardingPerson($registeredPersonData);
 
 		if (!isEmptyArray($person))
 		{
@@ -244,7 +369,7 @@ class OnboardingRegistrierungLib
 				);
 
 				// map to address
-				$adresse = $this->_mapOnboardingAdresse($registeredPersonData);
+				$adresse = $this->_ci->OnboardingMappingLib->mapOnboardingAdresse($registeredPersonData);
 
 				if (!isEmptyArray($adresse))
 				{
@@ -256,27 +381,36 @@ class OnboardingRegistrierungLib
 					if (isError($adresseRes)) $errors[] = getError($adresseRes);
 				}
 
-				if (isset($email))
+				// map to email Kontakt
+				$emailKontakt = $this->_ci->OnboardingMappingLib->mapEmail($email);
+
+				if (!isEmptyArray($emailKontakt))
 				{
-					// map to email Kontakt
-					$emailKontakt = $this->_mapEmail($email);
+					// save kontakt
+					$kontaktRes = $this->_ci->KontaktModel->insert(
+						array_merge(
+							$emailKontakt,
+							['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON]
+						)
+					);
 
-					if (!isEmptyArray($emailKontakt))
+					if (isError($kontaktRes)) $errors[] = getError($kontaktRes);
+
+					if (hasData($kontaktRes))
 					{
-						// save kontakt
-						$kontaktRes = $this->_ci->KontaktModel->insert(
-							array_merge(
-								$emailKontakt,
-								['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON]
-							)
-						);
-
-						if (isError($kontaktRes)) $errors[] = getError($kontaktRes);
+						$verifikation_code = generateVerificationCode();
+						// write token to kontakt verifikation table
+						$this->_ci->KontaktverifikationModel->insert([
+							'kontakt_id' => getData($kontaktRes),
+							'verifikation_code' => $verifikation_code,
+							'erstelldatum' => date('Y-m-d H:i:s'),
+							'app' => self::ONBOARDING_APP_NAME,
+						]);
 					}
 				}
 
 				// map vBpks
-				$vBpks = $this->_mapOnboardingVbpk($registeredPersonData);
+				$vBpks = $this->_ci->OnboardingMappingLib->mapOnboardingVbpk($registeredPersonData);
 
 				if (!isEmptyArray($vBpks))
 				{
@@ -293,29 +427,29 @@ class OnboardingRegistrierungLib
 						if (isError($vBpkRes)) $errors[] = getError($vBpkRes);
 					}
 				}
-				else
-				{
-					// map wBpks
-					$wBpks = $this->_mapOnboardingWbpk($registeredPersonData);
+				//~ else
+				//~ {
+					//~ // map wBpks
+					//~ $wBpks = $this->_ci->OnboardingMappingLib->mapOnboardingWbpk($registeredPersonData);
 
-					if (!isEmptyArray($wBpks))
-					{
-						foreach ($wBpks as $vBpk)
-						{
-							// save vBpk
-							$vBpkRes = $this->_ci->KennzeichenModel->insert(
-								array_merge(
-									['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON],
-									$vBpk
-								)
-							);
+					//~ if (!isEmptyArray($wBpks))
+					//~ {
+						//~ foreach ($wBpks as $vBpk)
+						//~ {
+							//~ // save vBpk
+							//~ $vBpkRes = $this->_ci->KennzeichenModel->insert(
+								//~ array_merge(
+									//~ ['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_VON],
+									//~ $vBpk
+								//~ )
+							//~ );
 
-							if (isError($vBpkRes)) $errors[] = getError($vBpkRes);
-						}
-					}
-				}
+							//~ if (isError($vBpkRes)) $errors[] = getError($vBpkRes);
+						//~ }
+					//~ }
+				//~ }
 
-				$akte = $this->_mapOnboardingBild($registeredPersonData);
+				$akte = $this->_ci->OnboardingMappingLib->mapOnboardingBild($registeredPersonData);
 
 				if (!isEmptyArray($akte))
 				{
@@ -326,7 +460,7 @@ class OnboardingRegistrierungLib
 				}
 
 				// save registration id as kennzeichen
-				$kennzeichenRes = $this->_saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
+				$kennzeichenRes = $this->saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
 
 				if (isError($kennzeichenRes)) $errors[] = getError($kennzeichenRes);
 			}
@@ -348,8 +482,35 @@ class OnboardingRegistrierungLib
 		else
 		{
 			$this->_ci->db->trans_commit();
-			return success($person_id);
+			return success(['person_id' => $person_id, 'verifikation_code' => $verifikation_code]);
 		}
+	}
+
+	public function verifyRegistration($person_id, $verifikation_code)
+	{
+		// check if person has unverified contact with requested verification code
+		$kontaktRes = $this->_ci->KontaktverifikationModel->getKontaktVerifikation(
+			$person_id, self::EMAIL_UNVERIFIZIERT_KONTAKTTYP, $verifikation_code
+		);
+
+		// if not: verification failure
+		if (!hasData($kontaktRes)) return error("Verification failed");
+
+		$kontakt_id = getData($kontaktRes)[0]->kontakt_id;
+
+		// if verification successfull, set contact to verified
+		$kontaktUpdateRes = $this->_ci->KontaktModel->update(['kontakt_id' => $kontakt_id], ['kontakttyp' => self::EMAIL_KONTAKTTYP]);
+
+		if (isError($kontaktUpdateRes)) return $kontaktUpdateRes;
+
+		// update verification date
+		$kontaktVerifikationUpdateRes = $this->_ci->KontaktverifikationModel->update(
+			['kontakt_id' => $kontakt_id, 'verifikation_code' => $verifikation_code], ['verifikation_datum' => date('Y-m-d H:i:s')]
+		);
+
+		if (isError($kontaktVerifikationUpdateRes)) return $kontaktVerifikationUpdateRes;
+
+		return success("Successfully verified");
 	}
 
 	/**
@@ -366,161 +527,11 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
+	 * Redirects to application tool url
 	 */
 	public function redirectToApplicationTool()
 	{
 		redirect(base_url($this->_ci->config->item(self::APPLICATION_TOOL_PATH)));
-	}
-
-	// --------------------------------------------------------------------------------------------
-	// Private methods
-
-	private function _mapOnboardingPerson($onboardingPersonData)
-	{
-		if (!isset($onboardingPersonData->person)) return [];
-
-		$onboardingPerson = $onboardingPersonData->person;
-		return [
-			'vorname' => $onboardingPerson->vorname,
-			'nachname' => $onboardingPerson->familienname,
-			'gebdatum' => $onboardingPerson->geburtsdatum,
-			'geschlecht' => $this->_mapOnboardingGeschlecht($onboardingPerson),
-			'staatsbuergerschaft' => $this->_mapOnboardingStaatsangehoerigkeit($onboardingPerson),
-			'bpk' => $onboardingPerson->bpk ?? null,
-			'foto' => isset($onboardingPersonData->personenbild->bilddaten)
-				? $this->_ci->OnboardingAkteLib->resizeBase64ImageSmall($onboardingPersonData->personenbild->bilddaten)
-				: null,
-			'aktiv' => true
-		];
-	}
-
-	private function _mapOnboardingGeschlecht($onboardingPerson)
-	{
-		$geschlechtMappings = [
-			'M' => 'm',
-			'W' => 'w',
-			'D' => 'x'
-		];
-
-		return isset($onboardingPerson->geschlecht) && isset($geschlechtMappings[$onboardingPerson->geschlecht])
-			? $geschlechtMappings[$onboardingPerson->geschlecht]
-			: 'u';
-	}
-
-	/**
-	 *
-	 * @param
-	 * @return object success or error
-	 */
-	private function _mapOnboardingStaatsangehoerigkeit($onboardingPerson)
-	{
-		if (!isset($onboardingPerson->staatsangehoerigkeiten) || isEmptyArray($onboardingPerson->staatsangehoerigkeiten))
-			return null;
-
-		$nation_code = null;
-
-		$this->_ci->NationModel->addSelect('nation_code');
-		$nationRes = $this->_ci->NationModel->loadWhere(['iso3166_1_a3' => $onboardingPerson->staatsangehoerigkeiten[0]]);
-
-		return hasData($nationRes) ? getData($nationRes)[0]->nation_code : null;
-	}
-
-	private function _mapOnboardingVbpk($onboardingPersonData)
-	{
-		$resVbpks = [];
-		if (!isset($onboardingPersonData->person->vbpk)) return [];
-
-		$vBpks = $onboardingPersonData->person->vbpk;
-
-		foreach ($vBpks as $vBpk)
-		{
-			if (!isset($vBpk->bereich) || !isset($vBpk->wert)) continue;
-
-			$vbpkMappings = $this->_ci->config->item(self::VBPK_MAPPINGS);
-
-			if (isset($vbpkMappings[$vBpk->bereich]))
-			{
-				$resVbpks[] = ['kennzeichentyp_kurzbz' => $vbpkMappings[$vBpk->bereich], 'inhalt' => $vBpk->wert, 'aktiv' => true];
-			}
-		}
-
-		return $resVbpks;
-	}
-
-	private function _mapOnboardingWbpk($onboardingPersonData)
-	{
-		$resVbpks = [];
-		if (!isset($onboardingPersonData->person->wbpkListe)) return [];
-
-		$wBpks = $onboardingPersonData->person->wbpkListe;
-
-		foreach ($wBpks as $vBpk)
-		{
-			$arr = explode(':', $vBpk);
-
-			if (count($arr) != 2) continue;
-
-			$vbpkMappings = $this->_ci->config->item(self::VBPK_MAPPINGS);
-
-			if (isset($vbpkMappings[$arr[0]]))
-			{
-				$resVbpks[] = ['kennzeichentyp_kurzbz' => $vbpkMappings[$arr[0]], 'inhalt' => $arr[1], 'aktiv' => true];
-			}
-		}
-
-		return $resVbpks;
-	}
-
-
-	private function _mapOnboardingAdresse($onboardingPersonData)
-	{
-		if (!isset($onboardingPersonData->person->meldeadresse)) return [];
-
-		$onboardingAddress = $onboardingPersonData->person->meldeadresse;
-		$strasse = $onboardingAddress->strasse
-			.' '.$onboardingAddress->hausnummer
-			.(!isset($onboardingAddress->stiege) || isEmptyString($onboardingAddress->stiege) ? '' : '/'.$onboardingAddress->stiege)
-			.(!isset($onboardingAddress->tuer) || isEmptyString($onboardingAddress->tuer) ? '' : '/'.$onboardingAddress->tuer);
-
-		return [
-			'strasse' => $strasse,
-			'plz' => $onboardingAddress->postleitzahl ?? null,
-			'ort' => $onboardingAddress->ortschaft ?? null,
-			'gemeinde' => $onboardingAddress->gemeindebezeichnung ?? null,
-			'nation' => 'A',
-			'typ' => 'h',
-			'heimatadresse' => true,
-			'zustelladresse' => true,
-		];
-	}
-
-	private function _mapOnboardingBild($onboardingPersonData)
-	{
-		if (!isset($onboardingPersonData->personenbild->bilddaten)) return [];
-
-		$onboardingBild = $onboardingPersonData->personenbild;
-		$mimetype = $this->_ci->OnboardingAkteLib->getMimeTypeFromFile(base64_decode($onboardingBild->bilddaten));
-		$fileEndingArr = explode('/', $mimetype);
-
-		return [
-			'titel' => isset($fileEndingArr[1]) ? '.'.explode('/', $mimetype)[1] : '', // file ending
-			'bezeichnung' => 'Lichtbild gross',
-			'mimetype' => $mimetype,
-			'dokument_kurzbz' => 'Lichtbil',
-			'dokument_bezeichnung' => 'Lichtbild',
-			'erstelltam' => $onboardingBild->datum ?? date('Y-m-d'),
-			'file_content' => $onboardingBild->bilddaten
-		];
-	}
-
-	private function _mapEmail($email)
-	{
-		return [
-			'kontakt' => $email,
-			'kontakttyp' => self::EMAIL_KONTAKTTYP,
-			'zustellung' => true
-		];
 	}
 
 	/**
@@ -529,7 +540,7 @@ class OnboardingRegistrierungLib
 	 * @param $registrationId
 	 * @return object success or error
 	 */
-	private function _saveRegistrierungsIdAsKennzeichen($person_id, $registrationId)
+	public function saveRegistrierungsIdAsKennzeichen($person_id, $registrationId)
 	{
 		$this->_ci->KennzeichenModel->addSelect('person_id');
 		$kennzeichenRes = $this->_ci->KennzeichenModel->loadWhere(

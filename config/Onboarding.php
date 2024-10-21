@@ -4,7 +4,7 @@
 $config['onboarding_registration_url'] = 'https://qs.studienzulassung.gv.at/registrieren';
 
 // all vBpk type mappings
-$config['onboarding_vbpk_type_mappings'] = ['AS' => 'vbpkAs', 'BF' => 'vbpkBf', 'ZP-TD' => 'vbpkBmf'];
+$config['onboarding_vbpk_type_mappings'] = ['AS' => 'vbpkAs', 'BF' => 'vbpkBf', 'ZP-TD' => 'vbpkTd'];
 
 // link to landing page of native application tool
 $config['onboarding_application_tool_path'] = 'addons/bewerbung/cis/bewerbung.php?active=';

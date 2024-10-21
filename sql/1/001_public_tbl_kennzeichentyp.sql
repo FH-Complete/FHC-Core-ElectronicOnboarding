@@ -2,5 +2,5 @@ INSERT INTO public.tbl_kennzeichentyp (kennzeichentyp_kurzbz, bezeichnung, aktiv
 ('eobRegistrierungsId', 'Electronic Onboarding Registrierungsid', TRUE),
 ('vbpkAs', 'Statistik vBpk', TRUE),
 ('vbpkBf', 'Bildung vBpk', TRUE),
-('vbpkBmf', 'Transparenzdatenbank vBpk', TRUE)
+('vbpkTd', 'Transparenzdatenbank vBpk', TRUE)
 ON CONFLICT (kennzeichentyp_kurzbz) DO NOTHING;

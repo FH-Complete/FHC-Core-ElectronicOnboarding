@@ -24,6 +24,13 @@ function computeCodeChallangeHash($codeVerifier)
 }
 
 // base 64 url encode
-function base64_urlencode($value) {
+function base64_urlencode($value)
+{
 	return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+}
+
+function generateVerificationCode()
+{
+	return bin2hex(openssl_random_pseudo_bytes(16));
+	//return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }

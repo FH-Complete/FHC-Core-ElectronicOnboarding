@@ -15,11 +15,11 @@ class OnboardingRegistrierung extends FHC_Controller
 		parent::__construct();
 
 		$this->load->model('person/Kontakt_model', 'KontaktModel');
-		$this->load->model('person/Person_model', 'PersonModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingAbfragenModel', 'AbfragenModel');
 
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierungLib', null, 'OnboardingRegistrierungLib');
+		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingMailLib', null, 'OnboardingMailLib');
 	}
-
 
 	/**
 	 * Start the onboarding, redirect to onboarding tool for creating new onboarding track
@@ -41,8 +41,8 @@ class OnboardingRegistrierung extends FHC_Controller
 	}
 
 	/**
-	 * Verifying login, starting "native" onboarding process in system.
-	 * This method is redirection point for return from onboarding tool.
+	 * Verifying login, starting onboarding process in fhc system.
+	 * This method is landing point for return from onboarding tool.
 	 */
 	public function registerOnboarding()
 	{
@@ -64,36 +64,37 @@ class OnboardingRegistrierung extends FHC_Controller
 		// store verified registration id in session
 		$this->OnboardingRegistrierungLib->storeVerifiedRegistrationId($registrationId);
 
-		// is the registration id already saved for a person?
-		$this->load->model('person/Kennzeichen_model', 'KennzeichenModel');
-		$kennzeichenRes = $this->KennzeichenModel->loadWhere(
-			['kennzeichentyp_kurzbz' => OnboardingRegistrierungLib::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP, 'inhalt' => $registrationId]
-		);
+		// check if person is already registered
+		$bpk = $onboardingData->person->bpk ?? null;
+		$personCheckRes = $this->OnboardingRegistrierungLib->checkPersonRegistered($registrationId, $bpk);
 
-		if (isError($kennzeichenRes)) show_error(getError($kennzeichenRes));
+		if (isError($personCheckRes)) show_error(getError($email));
+		if (!hasData($personCheckRes)) show_error("Error when checking registered person");
 
-		// is the bpk already saved for a person?
-		$personRes = null;
-		if (isset($onboardingData->person->bpk))
+		$personCheck = getData($personCheckRes);
+		$verified = $personCheck['verified'];
+		$email = $personCheck['email'];
+		$person_id = $personCheck['person_id'];
+
+		// if email verified
+		if ($verified === true)
 		{
-			$this->PersonModel->addSelect('1');
-			$this->PersonModel->addOrder('person_id', 'DESC');
-			$this->PersonModel->addLimit(1);
-			$personRes = $this->PersonModel->loadWhere(['bpk' => $onboardingData->person->bpk]);
+			// person already registered
 
-			if (isError($personRes)) show_error(getError($personRes));
-		}
+			//-> save the registration id if not already saved (e.g. when person already registered another way)
+			$this->OnboardingRegistrierungLib->saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
 
-		if (hasData($kennzeichenRes) || hasData($personRes))
-		{
-			// person already registered -> proceed to application tool immediately
-			$this->_registerOnboarding();
+			//-> proceed to application tool
+			$this->finishOnboarding($person_id);
 		}
 		else
 		{
 			// new person -> redirect to registration page (getting additional data from user, like mail)
 			$this->load->helper(['form']);
-			$this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierung', ['onboardingData' => $onboardingData]);
+			$this->load->view(
+				'extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierung',
+				['onboardingData' => $onboardingData, 'email' => $email, 'registrationId' => $registrationId]
+			);
 		}
 	}
 
@@ -102,16 +103,32 @@ class OnboardingRegistrierung extends FHC_Controller
 	 */
 	public function registerNewOnboarding()
 	{
+		$registrationId = $this->input->post('registrationId');
+
+		if (!isset($registrationId)) show_error("Registration Id missing");
+
+		// TODO necessary to verify pkce again? - probably not
 		// verify pkce token
-		$pkceVerified = $this->OnboardingRegistrierungLib->verifyPkce($this->OnboardingRegistrierungLib->getVerifiedRegistrationId());
+		//~ $pkceVerified = $this->OnboardingRegistrierungLib->verifyPkce($this->OnboardingRegistrierungLib->getVerifiedRegistrationId());
 
-		if (isError($pkceVerified))
-		{
-			$this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierungFehlerseite');
-			return;
-		}
+		//~ if (isError($pkceVerified))
+		//~ {
+			//~ $this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierungFehlerseite');
+			//~ return;
+		//~ }
 
-		$onboardingData = getData($pkceVerified);
+		//$onboardingData = getData($pkceVerified);
+
+		// get onboarding data of the registered person
+		$abfragenRes = $this->AbfragenModel->abfragen($registrationId);
+
+		if (isError($abfragenRes)) show_error(getError($abfragenRes));
+
+		if (!hasData($abfragenRes)) show_error("No registration data found");
+
+		$onboardingData = getData($abfragenRes);
+
+		if (!$this->OnboardingRegistrierungLib->checkOnboardingTrackDataVerified($onboardingData)) show_error("Invalid registration data");
 
 		// validate form
 		$this->load->library('form_validation');
@@ -128,7 +145,10 @@ class OnboardingRegistrierung extends FHC_Controller
 					{
 						$this->KontaktModel->addSelect('1');
 						$kontaktRes = $this->KontaktModel->loadWhere(
-							['kontakttyp' => OnboardingRegistrierungLib::EMAIL_KONTAKTTYP, 'kontakt' => $email]
+							[
+								'kontakttyp' => OnboardingRegistrierungLib::EMAIL_KONTAKTTYP,
+								'kontakt' => $email
+							]
 						);
 
 						return isSuccess($kontaktRes) && !hasData($kontaktRes);
@@ -136,40 +156,75 @@ class OnboardingRegistrierung extends FHC_Controller
 				]
 			],
 			[
-				'required' => '%s is missing',
-				'valid_email' => '%s is not a valid email',
-				'email_unique' => 'The email %s is already registered. Please choose a different email or use a different login method.'
+				'required' => "Email is missing",
+				'valid_email' => "The email is not valid",
+				'email_unique' => "The email is already registered. Please choose a different email or use a different login method."
 			]
 		);
 
 		// if validation failed, ask for input again
 		if ($this->form_validation->run() == false)
 		{
-			$this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierung', ['onboardingData' => $onboardingData]);
+			$this->load->view(
+				'extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierung',
+				['onboardingData' => $onboardingData, 'registrationId' => $registrationId, 'email' => '']
+			);
 		}
 		else
 		{
 			// validation successfull - proceed with received parameters
 			$email = $this->input->post('email');
-			$this->_registerOnboarding($email);
+
+			// save person data with unverified email
+			$personSaveRes = $this->OnboardingRegistrierungLib->saveRegisteredPersonData($email, $registrationId);
+
+			if (isError($personSaveRes)) show_error(getError($personSaveRes));
+
+			if (!hasData($personSaveRes) || !isset(getData($personSaveRes)['person_id']))
+				show_error("person not successfully saved");
+
+			$personData = getData($personSaveRes);
+
+			// send verification email
+			$mailRes = $this->OnboardingMailLib->sendOnboardingVerificationMail($email, $personData['person_id'], $personData['verifikation_code']);
+
+			if (!$mailRes) show_error("Fehler beim Senden der Mail");
+
+			// redirect to "mail sent" info page
+			$this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingVerificationMailSent', ['email' => $email]);
 		}
 	}
 
 	/**
-	 * Registering a successfull onboarding
+	 * Verifies Registration by checking verification code for a person
+	 * @param
+	 * @return object success or error
+	 */
+	public function verifyRegistration()
+	{
+		// check params
+		$person_id = $this->input->get('person_id');
+		if (!isset($person_id) || !is_numeric($person_id)) show_error("Person Id missing");
+
+		$verifikation_code = $this->input->get('verifikation_code');
+		if (!isset($verifikation_code) || isEmptyString($verifikation_code)) show_error("Verification code missing");
+
+		// verifying code for a person
+		$verified = $this->OnboardingRegistrierungLib->verifyRegistration($person_id, $verifikation_code);
+
+		// show error if not verified
+		if (isError($verified)) show_error(getError($verified));
+
+		// finish onboarding process if verification successfull
+		$this->finishOnboarding($person_id);
+	}
+
+	/**
+	 * Registering a successfull onboarding (new or existing person)
 	 * @param $email needed if it is a new (first) registration
 	 */
-	private function _registerOnboarding($email = null)
+	private function finishOnboarding($person_id)
 	{
-		// (possibly) save person data
-		$personSaveRes = $this->OnboardingRegistrierungLib->saveRegisteredPersonData($email);
-
-		if (isError($personSaveRes)) show_error(getError($personSaveRes));
-
-		if (!hasData($personSaveRes) || !is_numeric(getData($personSaveRes))) show_error("No person Id returned");
-
-		$person_id = getData($personSaveRes);
-
 		// mark person as registered for application tool
 		$this->OnboardingRegistrierungLib->loginRegisteredPerson($person_id);
 
