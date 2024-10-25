@@ -34,3 +34,16 @@ function generateVerificationCode()
 	return bin2hex(openssl_random_pseudo_bytes(16));
 	//return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }
+
+/**
+ *
+ * @param
+ * @return array
+ */
+function checkEquality($objectA, $arrayB)
+{
+	if (!is_object($objectA) || !is_array($arrayB)) return false;
+
+	$arrayA = (array) $objectA;
+	return array_diff($arrayA, array_diff($arrayA, $arrayB)) === $arrayB;
+}

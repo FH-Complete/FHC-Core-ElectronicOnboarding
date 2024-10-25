@@ -15,7 +15,8 @@ class OnboardingRegistrierung extends FHC_Controller
 		parent::__construct();
 
 		$this->load->model('person/Kontakt_model', 'KontaktModel');
-		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingAbfragenModel', 'AbfragenModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingKontakt_model', 'OnboardingKontaktModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingAbfragenModel', 'AbfragenModel');
 
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierungLib', null, 'OnboardingRegistrierungLib');
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingMailLib', null, 'OnboardingMailLib');
@@ -81,8 +82,8 @@ class OnboardingRegistrierung extends FHC_Controller
 		{
 			// person already registered
 
-			//-> save the registration id if not already saved (e.g. when person already registered another way)
-			$this->OnboardingRegistrierungLib->saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
+			//-> update the person data
+			$personSaveRes = $this->OnboardingRegistrierungLib->saveRegisteredPersonData($registrationId, $email, $person_id);
 
 			//-> proceed to application tool
 			$this->finishOnboarding($person_id);
@@ -143,15 +144,14 @@ class OnboardingRegistrierung extends FHC_Controller
 					'email_unique',
 					function($email)
 					{
-						$this->KontaktModel->addSelect('1');
-						$kontaktRes = $this->KontaktModel->loadWhere(
-							[
-								'kontakttyp' => OnboardingRegistrierungLib::EMAIL_KONTAKTTYP,
-								'kontakt' => $email
-							]
+						$emailUsedRes = $this->OnboardingKontaktModel->checkEmailUsed(
+							$email,
+							OnboardingRegistrierungLib::EMAIL_KONTAKTTYP,
+							OnboardingRegistrierungLib::EMAIL_UNVERIFIZIERT_KONTAKTTYP,
+							OnboardingRegistrierungLib::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP
 						);
 
-						return isSuccess($kontaktRes) && !hasData($kontaktRes);
+						return isSuccess($emailUsedRes) && !hasData($emailUsedRes);
 					}
 				]
 			],
@@ -176,7 +176,7 @@ class OnboardingRegistrierung extends FHC_Controller
 			$email = $this->input->post('email');
 
 			// save person data with unverified email
-			$personSaveRes = $this->OnboardingRegistrierungLib->saveRegisteredPersonData($email, $registrationId);
+			$personSaveRes = $this->OnboardingRegistrierungLib->saveRegisteredPersonData($registrationId, $email);
 
 			if (isError($personSaveRes)) show_error(getError($personSaveRes));
 

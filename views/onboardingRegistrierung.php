@@ -1,6 +1,6 @@
 <?php
 	$includesArray = array(
-		'title' => 'Login abschließen',
+		'title' => 'Registrierung verifizieren',
 		'bootstrap5' => true,
 		'fontawesome6' => true,
 		'navigationcomponent' => true
@@ -12,7 +12,7 @@
 	<div class="container">
 		<br>
 		<header>
-			<h1 class="h2 fhc-hr">Login abschließen für</h1>
+			<h1 class="h2 fhc-hr">Registrierung verifizieren für</h1>
 		</header>
 		<br>
 		<div class="row">
@@ -73,7 +73,7 @@
 												placeholder="name@example.com"
 												aria-label="Email"
 												aria-describedby="email-button"/>
-											<button type="submit" id="email-button" class="btn btn-primary">Login abschließen</button>
+											<button type="submit" id="email-button" class="btn btn-primary">Registrierung verifizieren</button>
 										</div>
 									</div>
 								</div>

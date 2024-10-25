@@ -16,15 +16,15 @@ class OnboardingAkteLib
 
 		$this->_ci->load->model('content/TempFS_model', 'TempFSModel');
 
-		$this->_ci->load->library('AkteLib', array('who' => OnboardingRegistrierungLib::INSERT_VON));
+		$this->_ci->load->library('AkteLib', array('who' => OnboardingRegistrierungLib::INSERT_UPDATE_VON));
 	}
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
-	
+
 
 	/**
-	 * 
+	 *
 	 * @param
 	 * @return object success or error
 	 */

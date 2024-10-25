@@ -45,7 +45,7 @@ class OnboardingMailLib
 
 		$betreff = 'Zugang zu Ihrer Bewerbung';
 
-		$anrede = ($person->geschlecht == 'm' ? 'Sehr geehrter Herr ' : $person->geschlecht == 'w' ? 'Sehr geehrte Frau ' : 'Sehr geehrte/r');
+		$anrede = $person->geschlecht == 'm' ? 'Sehr geehrter Herr ' : ($person->geschlecht == 'w' ? 'Sehr geehrte Frau ' : 'Sehr geehrte/r');
 
 		$mailcontent_data_arr = array(
 			'anrede' => $anrede,

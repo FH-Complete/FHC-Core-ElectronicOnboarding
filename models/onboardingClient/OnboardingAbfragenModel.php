@@ -1,6 +1,6 @@
 <?php
 
-require_once APPPATH.'models/extensions/FHC-Core-ElectronicOnboarding/OnboardingClientModel.php';
+require_once APPPATH.'models/extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingClientModel.php';
 
 /**
  * Implements the requests for onbaording track

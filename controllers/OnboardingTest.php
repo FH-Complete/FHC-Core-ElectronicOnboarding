@@ -22,7 +22,7 @@ class OnboardingTest extends CLI_Controller
 	public function onboardingAbfragen($registrationId)
 	{
 		// Loads models
-		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingAbfragenModel', 'AbfragenModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingAbfragenModel', 'AbfragenModel');
 
 		$abfrageRes = $this->AbfragenModel->abfragen($registrationId);
 
@@ -43,7 +43,7 @@ class OnboardingTest extends CLI_Controller
 	public function startOnboarding()
 	{
 		// Loads models
-		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingStartModel', 'StartModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingStartModel', 'StartModel');
 
 		$startRes = $this->StartModel->start();
 
@@ -75,7 +75,7 @@ class OnboardingTest extends CLI_Controller
 	public function verifyPkce($registrationId, $pkce)
 	{
 		// Loads models
-		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/OnboardingVerifyPkceModel', 'VerifyPkceModel');
+		$this->load->model('extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingVerifyPkceModel', 'VerifyPkceModel');
 
 		$verifyRes = $this->VerifyPkceModel->verifyPkce($registrationId, $pkce);
 

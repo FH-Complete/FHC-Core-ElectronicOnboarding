@@ -1,6 +1,6 @@
 <?php
 
-require_once APPPATH.'models/extensions/FHC-Core-ElectronicOnboarding/OnboardingClientModel.php';
+require_once APPPATH.'models/extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingClientModel.php';
 
 /**
  * Implements the onbaording start (getting registration id)
@@ -21,7 +21,7 @@ class OnboardingStartModel extends OnboardingClientModel
 	// Public methods
 
 	/**
-	 * Starts onbaording process
+	 * Starts onbaording process, gets registration Id
 	 */
 	public function start()
 	{
