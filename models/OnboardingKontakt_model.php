@@ -36,7 +36,7 @@ class OnboardingKontakt_model extends Kontakt_model
 	/**
 	 *
 	 */
-	public function checkEmailUsed($email, $email_verified_name, $email_unverified_name, $registration_id_name)
+	public function checkEmailUsed($email, $kontakttyp)
 	{
 		$sql = "
 			SELECT
@@ -46,29 +46,11 @@ class OnboardingKontakt_model extends Kontakt_model
 			WHERE
 				zustellung = TRUE
 				AND kontakt = ?
-				AND
-				(
-					-- either there is already a verified email
-					kontakttyp = ?
-					OR
-					(
-						-- or there is an unverified email, but not registered with onboarding
-						kontakttyp = ?
-						AND NOT EXISTS(
-							SELECT
-								1
-							FROM
-								public.tbl_kennzeichen
-							WHERE
-								person_id = kt.person_id
-								AND kennzeichentyp_kurzbz = ?
-						)
-					)
-				)
+				AND kontakttyp = ?
 			ORDER BY
 				kontakt_id
 			LIMIT 1";
 
-		return $this->execQuery($sql, [$email, $email_verified_name, $email_unverified_name, $registration_id_name]);
+		return $this->execQuery($sql, [$email, $kontakttyp]);
 	}
 }

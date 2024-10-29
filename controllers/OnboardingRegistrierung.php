@@ -146,9 +146,7 @@ class OnboardingRegistrierung extends FHC_Controller
 					{
 						$emailUsedRes = $this->OnboardingKontaktModel->checkEmailUsed(
 							$email,
-							OnboardingRegistrierungLib::EMAIL_KONTAKTTYP,
-							OnboardingRegistrierungLib::EMAIL_UNVERIFIZIERT_KONTAKTTYP,
-							OnboardingRegistrierungLib::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP
+							OnboardingRegistrierungLib::EMAIL_KONTAKTTYP
 						);
 
 						return isSuccess($emailUsedRes) && !hasData($emailUsedRes);
