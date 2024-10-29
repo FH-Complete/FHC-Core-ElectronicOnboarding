@@ -21,7 +21,7 @@
 					<div class="card-body">
 						<div class="row">
 							<?php if (isset($onboardingData->personenbild->bilddaten)): ?>
-							<div class="col-lg-3 text-center mb-3 mb-md-0">
+							<div class="col-lg-3 text-center mb-sm-3 mb-md-3 mb-lg-0">
 								<img
 									src="data:image/gif;base64,<?php echo $onboardingData->personenbild->bilddaten?>"
 									class="img-fluid rounded-3"
