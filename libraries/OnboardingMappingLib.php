@@ -170,6 +170,8 @@ class OnboardingMappingLib
 
 	public function mapEmail($email)
 	{
+		if (!isset($email)) return [];
+
 		return [
 			'kontakt' => $email,
 			'kontakttyp' => self::EMAIL_UNVERIFIZIERT_KONTAKTTYP,

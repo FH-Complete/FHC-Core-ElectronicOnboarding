@@ -23,7 +23,7 @@
 				</p>
 				<p>
 					In der Regel erhalten Sie das Mail in wenigen Minuten. Wenn Sie nach <b>24 Stunden</b> noch kein Mail erhalten haben,
-					kontaktieren Sie bitte unsere <a href=\'https://www.technikum-wien.at/studienberatung-kontaktieren/\' target=\'_blank\'>Studienberatung</a>.
+					kontaktieren Sie bitte unsere <a href="https://www.technikum-wien.at/studienberatung-kontaktieren/" target="_blank">Studienberatung</a>.
 				</p>
 			</div>
 		</div>

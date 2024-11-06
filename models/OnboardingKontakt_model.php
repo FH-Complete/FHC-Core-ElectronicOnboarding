@@ -33,6 +33,24 @@ class OnboardingKontakt_model extends Kontakt_model
 		return $this->execQuery($sql, [$person_id, $kontakttypes]);
 	}
 
+	public function getByKontaktValue($kontakt, $kontakttyp)
+	{
+		$sql = "
+			SELECT
+				kontakt_id, person_id
+			FROM
+				public.tbl_kontakt kt
+			WHERE
+				zustellung = TRUE
+				AND kontakt = ?
+				AND kontakttyp = ?
+			ORDER BY
+				kontakt_id
+			LIMIT 1";
+
+		return $this->execQuery($sql, [$kontakt, $kontakttyp]);
+	}
+
 	/**
 	 *
 	 */
