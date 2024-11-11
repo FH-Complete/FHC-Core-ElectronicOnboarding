@@ -19,11 +19,16 @@
 				<span id="mail_icon" class="fa fa-envelope fa-2xl"></span>
 				</p>
 				<p>
-					Die E-Mail mit dem Link zu Ihrer Bewerbung wurde erfolgreich an <?php echo $email ?> verschickt.
+					<?php echo $this->p->t('onboarding', 'emailGesendet', [$email]); ?>
 				</p>
 				<p>
-					In der Regel erhalten Sie das Mail in wenigen Minuten. Wenn Sie nach <b>24 Stunden</b> noch kein Mail erhalten haben,
-					kontaktieren Sie bitte unsere <a href="https://www.technikum-wien.at/studienberatung-kontaktieren/" target="_blank">Studienberatung</a>.
+					<?php
+						echo $this->p->t(
+							'onboarding',
+							'emailGesendetHinweis',
+							['<a href="https://www.technikum-wien.at/studienberatung-kontaktieren/" target="_blank">', '</a>']
+						);
+					?>
 				</p>
 			</div>
 		</div>

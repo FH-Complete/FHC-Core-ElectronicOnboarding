@@ -24,6 +24,9 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierungLib', null, 'OnboardingRegistrierungLib');
 		$this->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingMailLib', null, 'OnboardingMailLib');
+
+		// Load Phrases
+		$this->loadPhrases(['onboarding']);
 	}
 
 	/**
@@ -155,9 +158,9 @@ class OnboardingRegistrierung extends FHC_Controller
 				]
 			],
 			[
-				'required' => "Email is missing",
-				'valid_email' => "The email is not valid",
-				'email_unique' => "The email is already registered. Please choose a different email or use a different login method."
+				'required' => $this->p->t('onboarding', 'emailFehlt'),
+				'valid_email' => $this->p->t('onboarding', 'emailUngueltig'),
+				'email_unique' => $this->p->t('onboarding', 'emailRegistriert')
 			]
 		);
 
@@ -238,7 +241,7 @@ class OnboardingRegistrierung extends FHC_Controller
 			// send verification email
 			$mailRes = $this->OnboardingMailLib->sendOnboardingVerificationMail($email, $personData['person_id'], $personData['verifikation_code']);
 
-			if (!$mailRes) show_error("Fehler beim Senden der Mail");
+			if (!$mailRes) show_error("Error when sending mail");
 
 			// redirect to "mail sent" info page
 			$this->load->view('extensions/FHC-Core-ElectronicOnboarding/onboardingVerificationMailSent', ['email' => $email]);

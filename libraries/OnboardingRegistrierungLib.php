@@ -182,6 +182,7 @@ class OnboardingRegistrierungLib
 		$person_id = null;
 
 		// is the registration id already saved for a person?
+		$this->_ci->KennzeichenModel->addSelect('person_id');
 		$kennzeichenRes = $this->_ci->KennzeichenModel->loadWhere(
 			['kennzeichentyp_kurzbz' => self::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP, 'inhalt' => $registrationId]
 		);

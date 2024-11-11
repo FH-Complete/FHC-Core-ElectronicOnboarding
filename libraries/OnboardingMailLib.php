@@ -43,9 +43,13 @@ class OnboardingMailLib
 
 		$person = getData($personRes)[0];
 
-		$betreff = 'Zugang zu Ihrer Bewerbung';
+		$betreff = $this->_ci->p->t('onboarding', 'bewerbungZugangEmailBetreff');
 
-		$anrede = $person->geschlecht == 'm' ? 'Sehr geehrter Herr ' : ($person->geschlecht == 'w' ? 'Sehr geehrte Frau ' : 'Sehr geehrte/r');
+		$anrede = ($person->geschlecht == 'm'
+			? $this->_ci->p->t('onboarding', 'bewerbungZugangEmailAnredeMaennlich')
+			: ($person->geschlecht == 'w'
+				? $this->_ci->p->t('onboarding', 'bewerbungZugangEmailAnredeWeiblich')
+				: $this->_ci->p->t('onboarding', 'bewerbungZugangEmailAnredeNeutral'))).' ';
 
 		$mailcontent_data_arr = array(
 			'anrede' => $anrede,
@@ -57,9 +61,11 @@ class OnboardingMailLib
 			)
 		);
 
+		$language = getUserLanguage();
+
 		// send mail with retrieved data
 		$sendRes = sendSanchoMail(
-			'OnboardingEmailVerifizierung',
+			$language == 'German' ? 'OnboardingEmailVerifizierung' : 'OnboardingEmailVerifizierungEngl',
 			$mailcontent_data_arr,
 			$email,
 			$betreff,

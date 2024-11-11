@@ -12,7 +12,7 @@
 	<div class="container">
 		<br>
 		<header>
-			<h1 class="h2 fhc-hr">Registrierung verifizieren für</h1>
+			<h1 class="h2 fhc-hr"><?php echo $this->p->t('onboarding', 'registrierungVerifzierenFuer') ?></h1>
 		</header>
 		<br>
 		<div class="row">
@@ -32,7 +32,7 @@
 							<div class="col-lg-<?php echo (isset($onboardingData->personenbild->bilddaten) ? 9 : 12) ?>">
 								<div class="row">
 									<div class="col-sm-3">
-										<p class="mb-0">Vorname</p>
+										<p class="mb-0"><?php echo $this->p->t('onboarding', 'vorname') ?></p>
 									</div>
 									<div class="col-sm-9">
 										<p class="text-muted mb-0"><?php echo $onboardingData->person->vorname; ?></p>
@@ -41,7 +41,7 @@
 								<hr>
 								<div class="row">
 									<div class="col-sm-3">
-										<p class="mb-0">Nachname</p>
+										<p class="mb-0"><?php echo $this->p->t('onboarding', 'nachname') ?></p>
 									</div>
 									<div class="col-sm-9">
 										<p class="text-muted mb-0"><?php echo $onboardingData->person->familienname; ?></p>
@@ -50,7 +50,7 @@
 								<hr>
 								<div class="row">
 									<div class="col-sm-3">
-										<p class="mb-0">Geburtsdatum</p>
+										<p class="mb-0"><?php echo $this->p->t('onboarding', 'geburtsdatum') ?></p>
 									</div>
 									<div class="col-sm-9">
 										<p class="text-muted mb-0"><?php echo date_format(date_create($onboardingData->person->geburtsdatum), 'd.m.Y'); ?></p>
@@ -62,7 +62,7 @@
 								class="form-inline"
 								method="POST">
 									<input type="hidden" name="registrationId" value="<?php echo $registrationId ?>"/>
-									<label class="form-label" for="verwendung_code">E-Mail Adresse</label>
+									<label class="form-label" for="verwendung_code"><?php echo $this->p->t('onboarding', 'emailAdresse') ?></label>
 									<div class="row">
 										<div class="col-sm-12 input-group">
 											<input
@@ -73,7 +73,9 @@
 												placeholder="name@example.com"
 												aria-label="Email"
 												aria-describedby="email-button"/>
-											<button type="submit" id="email-button" class="btn btn-primary">Registrierung verifizieren</button>
+											<button type="submit" id="email-button" class="btn btn-primary">
+												<?php echo $this->p->t('onboarding', 'registrierungVerifzieren') ?>
+											</button>
 										</div>
 									</div>
 								</div>
