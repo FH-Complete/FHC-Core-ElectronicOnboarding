@@ -87,14 +87,14 @@ class OnboardingRegistrierung extends FHC_Controller
 		// if email verified
 		if ($verified === true)
 		{
-			// person already registered
+			// person already registered and verified
 
 			//-> proceed to application tool
 			$this->_finishOnboarding($person_id, $registrationId);
 		}
 		else
 		{
-			// new person -> redirect to registration page (getting additional data from user, like mail)
+			// new person or not verified yet -> redirect to registration page (getting additional data from user, like mail)
 			$this->load->helper(['form']);
 			$this->load->view(
 				'extensions/FHC-Core-ElectronicOnboarding/onboardingRegistrierung',

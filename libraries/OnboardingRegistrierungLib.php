@@ -251,21 +251,26 @@ class OnboardingRegistrierungLib
 	{
 		if (!isset($registrationId) || isEmptyString($registrationId)) return error("Registration Id missing");
 
+		// get mapped person data:
+		$personDataRes = $this->_getMappedRegisteredPersonData($registrationId, $email);
+
+		if (isError($personDataRes)) return $personDataRes;
+		if (!hasData($personDataRes)) return error("error when mapping person");
+
+		$personData = getData($personDataRes);
+
 		$person_id = null;
 		$verifikation_code = null;
+		$bpk = isset($personData['person']['bpk']) ? $personData['person']['bpk'] : null;
 
-		// is the registration id already saved, i.e. person already registered?
-		$this->_ci->KennzeichenModel->addSelect('person_id');
-		$registrationIdRes = $this->_ci->KennzeichenModel->loadWhere(
-			['kennzeichentyp_kurzbz' => self::ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP, 'inhalt' => $registrationId]
-		);
+		$registrationRes = $this->checkPersonRegistered($registrationId, $bpk);
 
-		if (isError($registrationIdRes)) return $registrationIdRes;
+		if (isError($registrationRes)) return $registrationRes;
 
 		// if person already registered,
-		if (hasData($registrationIdRes))
+		if (hasData($registrationRes))
 		{
-			$person_id = getData($registrationIdRes)[0]->person_id;
+			$person_id = getData($registrationRes)['person_id'];
 
 			// get the token
 			$this->_ci->KontaktModel->addSelect('kontakt_id, kontakt_verifikation_id');
@@ -290,13 +295,6 @@ class OnboardingRegistrierungLib
 				if (isError($renewRes)) return $renewRes;
 			}
 		}
-
-		// get mapped person data:
-		$personDataRes = $this->_getMappedRegisteredPersonData($registrationId, $email);
-
-		if (isError($personDataRes)) return $personDataRes;
-
-		if (!hasData($personDataRes)) return error("error when mapping person");
 
 		// save person data
 		$saveRes = $this->_saveRegisteredPersonData($registrationId, getData($personDataRes), $person_id);
@@ -576,6 +574,9 @@ class OnboardingRegistrierungLib
 						{
 							$unverifiedKontakt = getData($unverifiedKontaktRes)[0];
 
+							// get verifikation code
+							$verifikation_code = $unverifiedKontakt->verifikation_code;
+
 							if ($personData['email_kontakt']['kontakt'] != $unverifiedKontakt->kontakt)
 							{
 								// update kontakt
@@ -611,7 +612,7 @@ class OnboardingRegistrierungLib
 									'kontakt_id' => getData($kontaktRes),
 									'verifikation_code' => $verifikation_code,
 									'erstelldatum' => date('Y-m-d H:i:s'),
-									'app' => self::ONBOARDING_APP_NAME,
+									'app' => self::ONBOARDING_APP_NAME
 								]);
 							}
 						}

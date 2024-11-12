@@ -19,15 +19,17 @@ class OnboardingKontakt_model extends Kontakt_model
 	{
 		$sql = "
 			SELECT
-				kontakt_id, kontakt
+				kt.kontakt_id, kt.kontakt,
+				(SELECT verifikation_code FROM public.tbl_kontakt_verifikation WHERE kontakt_id = kt.kontakt_id ORDER BY erstelldatum DESC LIMIT 1)
 			FROM
 				public.tbl_kontakt kt
+
 			WHERE
-				zustellung = TRUE
-				AND person_id = ?
-				AND kontakttyp IN ?
+				kt.zustellung = TRUE
+				AND kt.person_id = ?
+				AND kt.kontakttyp IN ?
 			ORDER BY
-				kontakt_id
+				kt.kontakt_id
 			LIMIT 1";
 
 		return $this->execQuery($sql, [$person_id, $kontakttypes]);
