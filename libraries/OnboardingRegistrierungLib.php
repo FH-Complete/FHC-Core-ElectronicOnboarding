@@ -513,7 +513,6 @@ class OnboardingRegistrierungLib
 				if (!isEmptyArray($personData['adresse']))
 				{
 					// check if adresse exists
-					$this->_ci->AdresseModel->addSelect('adresse_id');
 					$this->_ci->AdresseModel->addOrder('adresse_id');
 					$this->_ci->AdresseModel->addLimit(1);
 					$adresseLoadRes = $this->_ci->AdresseModel->loadWhere(['person_id' => $person_id, 'typ' => OnboardingMappingLib::ADRESSE_TYP]);
