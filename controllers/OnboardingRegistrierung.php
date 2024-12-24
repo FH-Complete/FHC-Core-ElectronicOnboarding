@@ -195,26 +195,35 @@ class OnboardingRegistrierung extends FHC_Controller
 
 				if (isError($saveRes)) show_error(getError($saveRes));
 
-				// check if there already is a contact notification entry
-				$this->KontaktverifikationModel->addSelect('verifikation_code');
+				// check if there already is a contact verification entry
+				$this->KontaktverifikationModel->addSelect('kontakt_verifikation_id');
 				$this->KontaktverifikationModel->addOrder('erstelldatum', 'DESC');
+				$this->KontaktverifikationModel->addLimit(1);
 				$kontaktVerifikationRes = $this->KontaktverifikationModel->loadWhere(
 					['kontakt_id' => $emailUnverifiedData->kontakt_id]
 				);
 
 				if (isError($kontaktVerifikationRes)) show_error(getError($kontaktVerifikationRes));
 
-				// if yes, get verification code
+				// generate verification code
+				$personData['verifikation_code'] = generateVerificationCode();
+
 				if (hasData($kontaktVerifikationRes))
 				{
-					$personData['verifikation_code'] = getData($kontaktVerifikationRes)[0]->verifikation_code;
+					// if there already is verification entry, update entry
+					$kontaktVerifikationInsRes = $this->KontaktverifikationModel->update(
+						['kontakt_verifikation_id' => getData($kontaktVerifikationRes)[0]->kontakt_verifikation_id],
+						[
+							'erstelldatum' => date('Y-m-d H:i:s'),
+							'verifikation_code' => $personData['verifikation_code']
+						]
+					);
+
+					if (isError($kontaktVerifikationInsRes)) show_error(getError($kontaktVerifikationInsRes));
 				}
 				else
 				{
-					// generate verification code
-					$personData['verifikation_code'] = generateVerificationCode();
-
-					// insert kontakt verification entry
+					// if no entry yet, insert kontakt verification entry
 					$kontaktVerifikationInsRes = $this->KontaktverifikationModel->insert([
 						'kontakt_id' => $emailUnverifiedData->kontakt_id,
 						'verifikation_code' => $personData['verifikation_code'],

@@ -3,7 +3,10 @@
 		'title' => 'Registrierung verifizieren',
 		'bootstrap5' => true,
 		'fontawesome6' => true,
-		'navigationcomponent' => true
+		'navigationcomponent' => true,
+		'customCSSs' => array(
+			'public/extensions/FHC-Core-ElectronicOnboarding/css/onboardingRegistrierung.css'
+		)
 	);
 
 	$this->load->view('templates/FHC-Header', $includesArray);
@@ -12,7 +15,7 @@
 	<div class="container">
 		<br>
 		<header>
-			<h1 class="h2 fhc-hr"><?php echo $this->p->t('onboarding', 'registrierungVerifzierenFuer') ?></h1>
+			<h1 class="h2 fhc-hr"><?php echo $this->p->t('onboarding', 'bewerbungVerifizierung') ?></h1>
 		</header>
 		<br>
 		<div class="row">
@@ -74,13 +77,60 @@
 												aria-label="Email"
 												aria-describedby="email-button"/>
 											<button type="submit" id="email-button" class="btn btn-primary">
-												<?php echo $this->p->t('onboarding', 'registrierungVerifzieren') ?>
+												<?php echo $this->p->t('onboarding', 'bewerbungVerifzieren') ?>
 											</button>
 										</div>
 									</div>
 								</div>
 							</form>
 						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-lg-11">
+				<div class="card mb-4 card-body">
+					<p>
+						<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungEinleitung') ?>
+					</p>
+					<p>
+						<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungKontakthinweis', ['https://www.technikum-wien.at/en/infocenter/']) ?>
+					</p>
+					<p>
+						<a
+							id="datenschutzSpoiler"
+							data-bs-toggle="collapse"
+							href="#datenschutzText"
+							role="button"
+							aria-expanded="false"
+							aria-controls="datenschutzText"
+							class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-100-hover"
+						>
+							<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungDatenschutzhinweis') ?>
+							<i class="fa-solid fa-caret-down"></i>
+						</a>
+					</p>
+					<div class="collapse" id="datenschutzText">
+						<p>
+							<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungDatenschutzhinweisText') ?>
+						</p>
+						<p>
+							<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungInformationenDatenschutzGrundverordnung').
+								'<br><a
+									href="https://www.technikum-wien.at/information-ueber-ihre-rechte-gemaess-datenschutz-grundverordnung"
+									target="_blank">
+									https://www.technikum-wien.at/information-ueber-ihre-rechte-gemaess-datenschutz-grundverordnung
+								</a>';
+							?>
+						</p>
+						<p>
+							<?php echo $this->p->t('onboarding', 'bewerbungVerifizierungDatenschutzFragen').
+								'<a href="mailto:datenschutz@technikum-wien.at" target="_blank">
+									datenschutz@technikum-wien.at
+								</a>';
+							 ?>
+						</p>
 					</div>
 				</div>
 			</div>
