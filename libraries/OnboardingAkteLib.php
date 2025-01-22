@@ -10,18 +10,17 @@ class OnboardingAkteLib
 	/**
 	 * Object initialization
 	 */
-	public function __construct()
+	public function __construct($args)
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		$this->_ci->load->model('content/TempFS_model', 'TempFSModel');
 
-		$this->_ci->load->library('AkteLib', array('who' => OnboardingRegistrierungLib::INSERT_UPDATE_VON));
+		$this->_ci->load->library('AkteLib', ['who' => $args['insert_update_von']]);
 	}
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
-
 
 	/**
 	 *

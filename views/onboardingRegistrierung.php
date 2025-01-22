@@ -15,7 +15,7 @@
 	<div class="container">
 		<br>
 		<header>
-			<h1 class="h2 fhc-hr"><?php echo $this->p->t('onboarding', 'bewerbungVerifizierung') ?></h1>
+			<h1 class="h2 fhc-hr"><?php echo $this->p->t('onboarding', 'bewerbungVerifzieren') ?></h1>
 		</header>
 		<br>
 		<div class="row">
@@ -60,31 +60,34 @@
 									</div>
 								</div>
 								<hr>
-								<form
-								action="<?php echo site_url("extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierung/registerNewOnboarding")?>"
-								class="form-inline"
-								method="POST">
-									<input type="hidden" name="registrationId" value="<?php echo $registrationId ?>"/>
-									<label class="form-label" for="verwendung_code"><?php echo $this->p->t('onboarding', 'emailAdresse') ?></label>
-									<div class="row">
-										<div class="col-sm-12 input-group">
-											<input
-												type="text"
-												class="form-control"
-												name="email"
-												value="<?php echo set_value('email', $email); ?>"
-												placeholder="name@example.com"
-												aria-label="Email"
-												aria-describedby="email-button"/>
-											<button type="submit" id="email-button" class="btn btn-primary">
-												<?php echo $this->p->t('onboarding', 'bewerbungVerifzieren') ?>
-											</button>
-										</div>
+					<form
+					action="<?php echo site_url("extensions/FHC-Core-ElectronicOnboarding/OnboardingRegistrierung/registerNewOnboarding")?>"
+					class="form-inline"
+					method="POST">
+								<input type="hidden" name="registrationId" value="<?php echo $registrationId ?>"/>
+								<label class="form-label" for="verwendung_code"><?php echo $this->p->t('onboarding', 'emailAdresse') ?></label>
+								<div class="row">
+									<div class="col-sm-12">
+										<input
+											type="text"
+											class="form-control"
+											name="email"
+											value="<?php echo set_value('email', $email); ?>"
+											placeholder="name@example.com"
+											aria-label="Email"
+											aria-describedby="email-button"/>
 									</div>
 								</div>
-							</form>
+							</div>
 						</div>
 					</div>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-lg-11">
+				<div class="text-danger text-center">
+					<b><?php echo validation_errors(); ?></b>
 				</div>
 			</div>
 		</div>
@@ -132,13 +135,32 @@
 							 ?>
 						</p>
 					</div>
-				</div>
-			</div>
-		</div>
-		<div class="row">
-			<div class="col-lg-11">
-				<div class="text-danger text-center">
-					<b><?php echo validation_errors(); ?></b>
+					<?php if ($confirmDatenschutzerklaerung): ?>
+							<div class="form-check">
+								<p>
+									<input class="form-check-input" type="checkbox" name="zustimmung_datenschutzerklaerung" value="" id="checkbox_zustimmung_datenschutzerklaerung">
+									<label class="form-check-label" for="checkbox_zustimmung_datenschutzerklaerung">
+										<?php echo $this->p->t('onboarding','zustimmungDatenschutzerklaerung') ?>
+									</label>
+								</p>
+							</div>
+					<?php endif; ?>
+					<?php if ($confirmDatenuebermittlung): ?>
+							<div class="form-check">
+								<p>
+									<input class="form-check-input" type="checkbox" name="zustimmung_datenuebermittlung" value="" id="checkbox_zustimmung_datenuebermittlung">
+									<label class="form-check-label" for="checkbox_zustimmung_datenuebermittlung">
+										<?php echo $this->p->t('onboarding','zustimmungDatenuebermittlung') ?>
+									</label>
+								</p>
+							</div>
+					<?php endif; ?>
+					<p>
+						<button type="submit" id="email-button" class="btn btn-primary">
+							<?php echo $this->p->t('onboarding', 'bewerbungVerifzieren') ?>
+						</button>
+					</p>
+					</form>
 				</div>
 			</div>
 		</div>

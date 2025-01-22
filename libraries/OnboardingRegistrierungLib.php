@@ -43,8 +43,16 @@ class OnboardingRegistrierungLib
 		$this->_ci->load->helper('extensions/FHC-Core-ElectronicOnboarding/hlp_onboarding_helper');
 
 		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingClientLib');
-		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingMappingLib', null, 'OnboardingMappingLib');
-		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingAkteLib', null, 'OnboardingAkteLib');
+		$this->_ci->load->library(
+			'extensions/FHC-Core-ElectronicOnboarding/OnboardingAkteLib',
+			['insert_update_von' => self::INSERT_UPDATE_VON],
+			'OnboardingAkteLib'
+		);
+		$this->_ci->load->library(
+			'extensions/FHC-Core-ElectronicOnboarding/OnboardingMappingLib',
+			null,
+			'OnboardingMappingLib'
+		);
 		$this->_ci->load->library('AkteLib');
 
 		$this->_ci->load->model('person/Person_model', 'PersonModel');
@@ -271,29 +279,6 @@ class OnboardingRegistrierungLib
 		if (hasData($registrationRes))
 		{
 			$person_id = getData($registrationRes)['person_id'];
-
-			// get the token
-			$this->_ci->KontaktModel->addSelect('kontakt_id, kontakt_verifikation_id');
-			$this->_ci->KontaktModel->addJoin('public.tbl_kontakt_verifikation', 'kontakt_id');
-			$this->_ci->KontaktModel->addOrder('erstelldatum', 'DESC');
-			$this->_ci->KontaktModel->addLimit(1);
-			$kontaktRes = $this->_ci->KontaktModel->loadWhere(
-				['person_id' => $person_id, 'kontakttyp' => OnboardingMappingLib::EMAIL_UNVERIFIZIERT_KONTAKTTYP]
-			);
-
-			if (isError($kontaktRes)) return $kontaktRes;
-
-			// renew the token
-			if (hasData($kontaktRes))
-			{
-				$verifikation_code = generateVerificationCode();
-				$renewRes = $this->_ci->KontaktverifikationModel->update(
-					['kontakt_verifikation_id' => getData($kontaktRes)[0]->kontakt_verifikation_id],
-					['verifikation_code' => $verifikation_code, 'erstelldatum' => date('Y-m-d H:i:s')]
-				);
-
-				if (isError($renewRes)) return $renewRes;
-			}
 		}
 
 		// save person data
@@ -513,21 +498,44 @@ class OnboardingRegistrierungLib
 				if (!isEmptyArray($personData['adresse']))
 				{
 					// check if adresse exists
-					$this->_ci->AdresseModel->addOrder('adresse_id');
-					$this->_ci->AdresseModel->addLimit(1);
-					$adresseLoadRes = $this->_ci->AdresseModel->loadWhere(['person_id' => $person_id, 'typ' => OnboardingMappingLib::ADRESSE_TYP]);
+					$this->_ci->AdresseModel->addOrder('adresse_id', 'DESC');
+					$addressesLoad = $this->_ci->AdresseModel->loadWhere(['person_id' => $person_id]);
 
-					if (isError($adresseLoadRes)) $errors[] = getError($adresseLoadRes);
+					if (isError($addressesLoad)) $errors[] = getError($addressesLoad);
 
-					// save adresse
-					if (hasData($adresseLoadRes))
+					$hasZustelladresse = false;
+					$hasHeimatadresse = false;
+					$meldeAdresse = null;
+
+					// get info from address list
+					if (hasData($addressesLoad))
 					{
-						$adresseLoadData = getData($adresseLoadRes)[0];
+						$addressesLoadData = getData($addressesLoad);
 
-						if (!checkEquality($adresseLoadData, $personData['adresse']))
+						foreach ($addressesLoadData as $address)
+						{
+							if ($address->typ == OnboardingMappingLib::ADRESSE_TYP)
+							{
+								$meldeAdresse = $address;
+							}
+							elseif ($address->zustelladresse == true)
+							{
+								$hasZustelladresse = true;
+							}
+							elseif ($address->heimatadresse == true)
+							{
+								$hasHeimatadresse = true;
+							}
+						}
+					}
+
+					// update address, if it already exists
+					if (isset($meldeAdresse))
+					{
+						if (!checkEquality($meldeAdresse, $personData['adresse']))
 						{
 							$adresseRes = $this->_ci->AdresseModel->update(
-								['adresse_id' => $adresseLoadData->adresse_id],
+								['adresse_id' => $meldeAdresse->adresse_id],
 								array_merge(
 									$personData['adresse'],
 									['person_id' => $person_id, 'updateamum' => date('Y-m-d H:i:s'), 'updatevon' => self::INSERT_UPDATE_VON]
@@ -537,12 +545,18 @@ class OnboardingRegistrierungLib
 							if (isError($adresseRes)) $errors[] = getError($adresseRes);
 						}
 					}
-					else
+					else // insert new, if no Meldeadresse yet
 					{
 						$adresseRes = $this->_ci->AdresseModel->insert(
 							array_merge(
 								$personData['adresse'],
-								['person_id' => $person_id, 'insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_UPDATE_VON]
+								[
+									'person_id' => $person_id,
+									'zustelladresse' => !$hasZustelladresse, // mark as Zustelladresse if there is none
+									'heimatadresse' => !$hasHeimatadresse,// mark as Heimatadresse if there is none
+									'insertamum' => date('Y-m-d H:i:s'),
+									'insertvon' => self::INSERT_UPDATE_VON
+								]
 							)
 						);
 
@@ -601,19 +615,6 @@ class OnboardingRegistrierungLib
 							);
 
 							if (isError($kontaktRes)) $errors[] = getError($kontaktRes);
-
-							if (hasData($kontaktRes))
-							{
-								$verifikation_code = generateVerificationCode();
-
-								// write token to kontakt verifikation table
-								$this->_ci->KontaktverifikationModel->insert([
-									'kontakt_id' => getData($kontaktRes),
-									'verifikation_code' => $verifikation_code,
-									'erstelldatum' => date('Y-m-d H:i:s'),
-									'app' => self::ONBOARDING_APP_NAME
-								]);
-							}
 						}
 					}
 				}

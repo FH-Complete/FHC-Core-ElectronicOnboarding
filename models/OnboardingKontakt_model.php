@@ -23,7 +23,6 @@ class OnboardingKontakt_model extends Kontakt_model
 				(SELECT verifikation_code FROM public.tbl_kontakt_verifikation WHERE kontakt_id = kt.kontakt_id ORDER BY erstelldatum DESC LIMIT 1)
 			FROM
 				public.tbl_kontakt kt
-
 			WHERE
 				kt.zustellung = TRUE
 				AND kt.person_id = ?

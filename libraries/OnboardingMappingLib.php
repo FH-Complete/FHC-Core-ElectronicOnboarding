@@ -26,8 +26,6 @@ class OnboardingMappingLib
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		$this->_ci->config->load('extensions/FHC-Core-ElectronicOnboarding/Onboarding');
-
-		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingAkteLib', null, 'OnboardingAkteLib');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -42,43 +40,14 @@ class OnboardingMappingLib
 			'vorname' => $onboardingPerson->vorname,
 			'nachname' => $onboardingPerson->familienname,
 			'gebdatum' => $onboardingPerson->geburtsdatum,
-			'geschlecht' => $this->mapOnboardingGeschlecht($onboardingPerson),
-			'staatsbuergerschaft' => $this->mapOnboardingStaatsangehoerigkeit($onboardingPerson),
-			'bpk' => $onboardingPerson->bpk ?? null,
+			'geschlecht' => $this->_mapOnboardingGeschlecht($onboardingPerson),
+			'staatsbuergerschaft' => $this->_mapOnboardingStaatsangehoerigkeit($onboardingPerson),
+			'bpk' => $this->mapOnboardingBpk($onboardingPerson->bpk),
 			'foto' => isset($onboardingPersonData->personenbild->bilddaten)
 				? $this->_ci->OnboardingAkteLib->resizeBase64ImageSmall($onboardingPersonData->personenbild->bilddaten)
 				: null,
 			'aktiv' => true
 		];
-	}
-
-	public function mapOnboardingGeschlecht($onboardingPerson)
-	{
-		$geschlechtMappings = [
-			'M' => 'm',
-			'W' => 'w',
-			'D' => 'x'
-		];
-
-		return isset($onboardingPerson->geschlecht) && isset($geschlechtMappings[$onboardingPerson->geschlecht])
-			? $geschlechtMappings[$onboardingPerson->geschlecht]
-			: 'u';
-	}
-
-	/**
-	 *
-	 * @param
-	 * @return object success or error
-	 */
-	public function mapOnboardingStaatsangehoerigkeit($onboardingPerson)
-	{
-		if (!isset($onboardingPerson->staatsangehoerigkeiten) || isEmptyArray($onboardingPerson->staatsangehoerigkeiten))
-			return null;
-
-		$this->_ci->NationModel->addSelect('nation_code');
-		$nationRes = $this->_ci->NationModel->loadWhere(['iso3166_1_a3' => $onboardingPerson->staatsangehoerigkeiten[0]]);
-
-		return hasData($nationRes) ? getData($nationRes)[0]->nation_code : null;
 	}
 
 	public function mapOnboardingVbpk($onboardingPersonData)
@@ -143,9 +112,7 @@ class OnboardingMappingLib
 			'ort' => $onboardingAddress->ortschaft ?? null,
 			'gemeinde' => $onboardingAddress->gemeindebezeichnung ?? null,
 			'nation' => self::AUSTRIA_NATION_CODE,
-			'typ' => self::ADRESSE_TYP,
-			'heimatadresse' => true,
-			'zustelladresse' => true
+			'typ' => self::ADRESSE_TYP
 		];
 	}
 
@@ -177,5 +144,49 @@ class OnboardingMappingLib
 			'kontakttyp' => self::EMAIL_UNVERIFIZIERT_KONTAKTTYP,
 			'zustellung' => true
 		];
+	}
+
+	public function mapOnboardingBpk($onboardingBpk)
+	{
+		if (!isset($onboardingBpk)) return null;
+
+		// strip the prefix
+		$position = strpos($onboardingBpk, ':');
+
+		$position = $position ? $position + 1 : 0;
+
+		return substr($onboardingBpk, $position);
+	}
+
+	// --------------------------------------------------------------------------------------------
+	// Private methods
+
+	private function _mapOnboardingGeschlecht($onboardingPerson)
+	{
+		$geschlechtMappings = [
+			'M' => 'm',
+			'W' => 'w',
+			'D' => 'x'
+		];
+
+		return isset($onboardingPerson->geschlecht) && isset($geschlechtMappings[$onboardingPerson->geschlecht])
+			? $geschlechtMappings[$onboardingPerson->geschlecht]
+			: 'u';
+	}
+
+	/**
+	 *
+	 * @param
+	 * @return object success or error
+	 */
+	private function _mapOnboardingStaatsangehoerigkeit($onboardingPerson)
+	{
+		if (!isset($onboardingPerson->staatsangehoerigkeiten) || isEmptyArray($onboardingPerson->staatsangehoerigkeiten))
+			return null;
+
+		$this->_ci->NationModel->addSelect('nation_code');
+		$nationRes = $this->_ci->NationModel->loadWhere(['iso3166_1_a3' => $onboardingPerson->staatsangehoerigkeiten[0]]);
+
+		return hasData($nationRes) ? getData($nationRes)[0]->nation_code : null;
 	}
 }
