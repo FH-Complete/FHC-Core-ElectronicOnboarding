@@ -77,6 +77,10 @@ class OnboardingRegistrierungLib
 	// --------------------------------------------------------------------------------------------
 	// Public methods
 
+	/**
+	* Get url for accessing the start of the onboarding processes
+	* @return success with url or error
+	*/
 	public function getRegistrierungUrl()
 	{
 		// Loads models
@@ -86,7 +90,7 @@ class OnboardingRegistrierungLib
 		$this->_pkceCodeVerifier = generateCodeVerifier();
 		$pkceCodeChallengeHash = computeCodeChallangeHash($this->_pkceCodeVerifier);
 
-		// get registration id
+		// get onboarding registration id
 		$startRes = $this->_ci->StartModel->start();
 
 		if (isError($startRes)) return $startRes;
@@ -95,6 +99,7 @@ class OnboardingRegistrierungLib
 
 		$registrationId = getData($startRes);
 
+		// return url string
 		return
 			success(
 				$this->_ci->config->item(self::REGISTRATION_URL_NAME)
@@ -105,8 +110,7 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
-	 * @param
+	 * Store pkce verifier in the session.
 	 * @return object success or error
 	 */
 	public function storePkceCodeVerifier()
@@ -121,8 +125,8 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
-	 * @param
+	 * verify pkce token for an oboarding track
+	 * @param $registrationId of the onboarding track
 	 * @return object success or error
 	 */
 	public function verifyPkce($registrationId)
@@ -134,18 +138,24 @@ class OnboardingRegistrierungLib
 		// Loads models
 		$this->_ci->load->model('extensions/FHC-Core-ElectronicOnboarding/onboardingClient/OnboardingVerifyPkceModel', 'VerifyPkceModel');
 
+		// verify pkce token by using verifier stored in session
 		$pkceRes = $this->_ci->VerifyPkceModel->verifyPkce($registrationId, $_SESSION[self::SESSION_PKCE_VERIFIER]);
 
 		if (isError($pkceRes)) return $pkceRes;
 
 		$pkceData = getData($pkceRes);
 
-		// read result and only verified if data verified in result
+		// if valid data with verified registration id is returned: return success
 		if ($this->checkOnboardingTrackDataVerified($pkceData)) return success($pkceData);
 
 		return error("Registration failed");
 	}
 
+	/**
+	* Store verified registration id in session
+	* @param $verifiedRegistrationId
+	* @return success or error
+	*/
 	public function storeVerifiedRegistrationId($verifiedRegistrationId)
 	{
 		if (session_status() === PHP_SESSION_NONE) session_start();
@@ -157,6 +167,10 @@ class OnboardingRegistrierungLib
 		return success();
 	}
 
+	/**
+	* Get verified registration id from session
+	* @return registration id or null
+	*/
 	public function getVerifiedRegistrationId()
 	{
 		if (session_status() === PHP_SESSION_NONE) session_start();
@@ -178,12 +192,12 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	* Checks if a registered (and verified) person exists in fhcomplete for an Onboarding track
+	* Cgets a registered person in fhcomplete for an Onboarding track. Includes info about email verification.
 	* @param registrationId
 	* @param bpk
 	* @return object success containing array with email and its verification status or error
 	*/
-	public function checkPersonRegistered($registrationId, $bpk)
+	public function getRegisteredPerson($registrationId, $bpk)
 	{
 		$email = null;
 		$verified = false;
@@ -251,9 +265,10 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
-	 * @param
-	 * @return object success or error
+	 * Save person data of registering person, email is unverified!
+	 * @param $registrationId
+	 * @param $email
+	*  @return success if successfully saved, or error
 	 */
 	public function saveUnverifiedRegistration($registrationId, $email)
 	{
@@ -271,11 +286,12 @@ class OnboardingRegistrierungLib
 		$verifikation_code = null;
 		$bpk = isset($personData['person']['bpk']) ? $personData['person']['bpk'] : null;
 
-		$registrationRes = $this->checkPersonRegistered($registrationId, $bpk);
+		// check if person is already registered via onboarding (has already a registration id, or a bpk)
+		$registrationRes = $this->getRegisteredPerson($registrationId, $bpk);
 
 		if (isError($registrationRes)) return $registrationRes;
 
-		// if person already registered,
+		// get person id, if person already registered
 		if (hasData($registrationRes))
 		{
 			$person_id = getData($registrationRes)['person_id'];
@@ -286,7 +302,6 @@ class OnboardingRegistrierungLib
 
 		if (isError($saveRes)) return $saveRes;
 
-		// save registration id as kennzeichen
 		if (!hasData($saveRes)) return error('Error when saving person data');
 
 		$personData = getData($personDataRes);
@@ -294,6 +309,12 @@ class OnboardingRegistrierungLib
 		return $saveRes;
 	}
 
+	/**
+	* Save registration, with a verified email!
+	* @param $registration Id onboarding Id
+	* @param $person Id
+	* @return success if successfully saved, or error
+	*/
 	public function saveVerifiedRegistration($registrationId, $person_id)
 	{
 		// check params
@@ -318,6 +339,12 @@ class OnboardingRegistrierungLib
 		return $saveRes;
 	}
 
+	/**
+	* Set person Kontakt to verified.
+	* @param person_id
+	* @param verifikation_code
+	* @return success when verified, or error
+	*/
 	public function verifyRegistration($person_id, $verifikation_code)
 	{
 		// check if person has unverified contact with requested verification code
@@ -346,9 +373,9 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
-	 * @param
-	 * @return object success or error
+	 * Login person in application tool by setting session params
+	 * @param person_id
+	 * @return void
 	 */
 	public function loginRegisteredPerson($person_id)
 	{
@@ -396,8 +423,9 @@ class OnboardingRegistrierungLib
 	}
 
 	/**
-	 *
-	 * @param
+	 * Gets onboarding track for a registraion Id and maps the data so it can be saved in university application.
+	 * @param $registrationId
+	 * @param $email additional data, not included in onboarding track
 	 * @return object success or error
 	 */
 	private function _getMappedRegisteredPersonData($registrationId, $email = null)
@@ -436,9 +464,11 @@ class OnboardingRegistrierungLib
 		return success($mappedRegisteredPersonData);
 	}
 
-		/**
-	 *
-	 * @param
+	/**
+	 * Saves registered person data in university applicaiton.
+	 * @param registrationId
+	 * @param personData ("mapped" onboarding track + additional data)
+	 * @param person_id
 	 * @return object success or error
 	 */
 	private function _saveRegisteredPersonData($registrationId, $personData, $person_id)

@@ -228,7 +228,7 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		if (!isset($registrationId)) return $this->_showErrorPage();
 
-		// verify pkce token (to make sure person who started oboarding process is the same)
+		// verify pkce token (to make sure person who started oboarding process is the same as the person after onboarding login)
 		$pkceVerified = $this->OnboardingRegistrierungLib->verifyPkce($registrationId);
 
 		if (isError($pkceVerified)) return $this->_showErrorPage();
@@ -240,7 +240,7 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		// check if person is already registered
 		$bpk = $onboardingData->person->bpk ? $this->OnboardingMappingLib->mapOnboardingBpk($onboardingData->person->bpk) : null;
-		$personCheckRes = $this->OnboardingRegistrierungLib->checkPersonRegistered($registrationId, $bpk);
+		$personCheckRes = $this->OnboardingRegistrierungLib->getRegisteredPerson($registrationId, $bpk);
 
 		if (isError($personCheckRes)) show_error(getError($email));
 		if (!hasData($personCheckRes)) show_error("Error when checking registered person");
@@ -277,8 +277,7 @@ class OnboardingRegistrierung extends FHC_Controller
 
 	/**
 	 * Verifies Registration by checking verification code for a person
-	 * @param
-	 * @return object success or error
+	 * @return void
 	 */
 	public function verifyRegistration()
 	{
@@ -300,7 +299,8 @@ class OnboardingRegistrierung extends FHC_Controller
 
 	/**
 	 * Registering a successfull onboarding
-	 * @param $email needed if it is a new (first) registration
+	 * @param $person_id
+	 * @param $registrationId
 	 */
 	private function _finishOnboarding($person_id, $registrationId = null)
 	{
@@ -316,7 +316,7 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		$registrationId = hasData($kennzeichenRes) ? getData($kennzeichenRes)[0]->inhalt : $registrationId;
 
-		//-> update the person data
+		// update the person data
 		$personSaveRes = $this->OnboardingRegistrierungLib->saveVerifiedRegistration($registrationId, $person_id);
 
 		if (isError($personSaveRes)) show_error(getError($personSaveRes));
