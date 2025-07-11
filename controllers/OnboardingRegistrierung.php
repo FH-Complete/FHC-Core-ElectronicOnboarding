@@ -51,6 +51,9 @@ class OnboardingRegistrierung extends FHC_Controller
 
 		if (isError($codeVerifierSaved)) show_error(getError($codeVerifierSaved));
 
+		// store Studiengangskennzahl (if passed from a website)
+		$this->OnboardingRegistrierungLib->storeStudiengangskennzahl($this->input->get('stg_kz'));
+
 		redirect(getData($registrationUrl));
 	}
 

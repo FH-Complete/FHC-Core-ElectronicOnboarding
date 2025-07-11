@@ -20,6 +20,9 @@ class OnboardingRegistrierungLib
 	const SESSION_PKCE_VERIFIER = 'onboarding/pkce_verifier';
 	const SESSION_VERIFIED_REGISTRATION_ID = 'onboarding/verified_registration_id';
 
+	// cookie names
+	const COOKIE_STUDIENGANGSKENNZAHL_NAME = 'onboarding_studiengangskennzahl';
+
 	// other constant values
 	const PKCE_STATUS_VERIFIZIERT = 'VERIFIZIERT';
 	const ONBOARDING_REGISTRATION_ID_KENNZEICHENTYP = 'eobRegistrierungsId';
@@ -40,6 +43,7 @@ class OnboardingRegistrierungLib
 		$this->_ci->config->load('extensions/FHC-Core-ElectronicOnboarding/OnboardingClient'); // Loads configuration
 		$this->_ci->config->load('extensions/FHC-Core-ElectronicOnboarding/Onboarding');
 
+		$this->_ci->load->helper('cookie');
 		$this->_ci->load->helper('extensions/FHC-Core-ElectronicOnboarding/hlp_onboarding_helper');
 
 		$this->_ci->load->library('extensions/FHC-Core-ElectronicOnboarding/OnboardingClientLib');
@@ -122,6 +126,18 @@ class OnboardingRegistrierungLib
 		$_SESSION[self::SESSION_PKCE_VERIFIER] = $this->_pkceCodeVerifier;
 
 		return success();
+	}
+
+	/**
+	 * Store Studiengangskennzahl as cookie.
+	 * @return void
+	 */
+	public function storeStudiengangskennzahl($studiengang_kz)
+	{
+		if (!isset($studiengang_kz) || isEmptyString($studiengang_kz)) return;
+
+		// set cookie expiring in 1 day
+		set_cookie(self::COOKIE_STUDIENGANGSKENNZAHL_NAME, $studiengang_kz, time()+60*60*24);
 	}
 
 	/**
@@ -390,7 +406,29 @@ class OnboardingRegistrierungLib
 	 */
 	public function redirectToApplicationTool()
 	{
-		redirect(base_url($this->_ci->config->item(self::APPLICATION_TOOL_PATH)));
+		$applicationToolPath = $this->_ci->config->item(self::APPLICATION_TOOL_PATH);
+
+		$stg_kz = get_cookie(self::COOKIE_STUDIENGANGSKENNZAHL_NAME);
+
+		// if studiengangskennzahl cookie is set, append it to url
+		if (isset($stg_kz))
+		{
+			$stg_kz_param = '';
+			$query = parse_url($applicationToolPath, PHP_URL_QUERY);
+
+			// parse_url returns a string if the URL has parameters or NULL if not
+			if ($query) {
+				$applicationToolPath .= '&stg_kz='.$stg_kz;
+			} else {
+				$applicationToolPath .= '?stg_kz='.$stg_kz;
+			}
+
+			// destroy cookie, it served its purpose
+			delete_cookie(self::COOKIE_STUDIENGANGSKENNZAHL_NAME);
+		}
+
+		// bye, bye!
+		redirect(base_url($applicationToolPath));
 	}
 
 	/**
@@ -730,13 +768,35 @@ class OnboardingRegistrierungLib
 						// save picture as Akte
 						$akteRes = $this->_ci->OnboardingAkteLib->saveBigImage($person_id, $personData['bild_akte']);
 
-						if (isError($akteRes)) $errors[] = getError($akteRes);
+						if (isError($akteRes))
+						{
+							$errors[] = getError($akteRes);
+						}
+						else
+						{
+							// set formal geprueft of Lichtbild
+							$akte_id = getData($akteRes);
+							if (!is_numeric($akte_id)) $errors[] = 'Invalid akte Id';
+
+							$akteFormalGeprueftRes = $this->_ci->AkteModel->update(
+								['akte_id' => $akte_id],
+								['formal_geprueft_amum' => date('Y-m-d H:i:s')]
+							);
+
+							if (isError($akteFormalGeprueftRes))
+							{
+								$errors[] = getError($akteRes);
+							}
+						}
 					}
 				}
 
-				// save registration id as kennzeichen
-				$saveRes = $this->saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
-				if (isError($saveRes)) $errors[] = getError($saveRes);
+				if (isEmptyArray($errors))
+				{
+					// save registration id as kennzeichen
+					$saveRes = $this->saveRegistrierungsIdAsKennzeichen($person_id, $registrationId);
+					if (isError($saveRes)) $errors[] = getError($saveRes);
+				}
 			}
 			else
 			{
