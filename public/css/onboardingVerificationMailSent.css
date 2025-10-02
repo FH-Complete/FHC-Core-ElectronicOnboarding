@@ -1,0 +1,11 @@
+#mail_icon {
+	position: relative;
+	animation-name: send_mail;
+	animation-duration: 2s;
+	animation-iteration-count: 2;
+}
+
+@keyframes send_mail {
+	from {left: 0px;}
+	to {left: 300px; opacity: 0}
+}
