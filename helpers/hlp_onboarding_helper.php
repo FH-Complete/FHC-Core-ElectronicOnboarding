@@ -35,15 +35,22 @@ function generateVerificationCode()
 	//return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }
 
-/**
- *
- * @param
- * @return array
- */
+// check, if an object and an array are equal (arrayB should not have any different keys or values than objectA)
 function checkEquality($objectA, $arrayB)
 {
 	if (!is_object($objectA) || !is_array($arrayB)) return false;
 
 	$arrayA = (array) $objectA;
 	return array_diff($arrayA, array_diff($arrayA, $arrayB)) === $arrayB;
+}
+
+// remove empty (null or empty string) from an array
+function removeEmptyValues($array)
+{
+	foreach ($array as $key => $value)
+	{
+		if ($value == null || $value == '') unset($array[$key]);
+	}
+
+	return $array;
 }

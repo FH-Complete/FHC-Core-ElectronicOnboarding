@@ -519,6 +519,9 @@ class OnboardingRegistrierungLib
 
 		if (!isEmptyArray($personData['person']))
 		{
+			// clear onboarding data of empty values (should be ignored, no updates with empty data)
+			$personData['person'] = removeEmptyValues($personData['person']);
+
 			// save person
 			if (is_numeric($person_id))
 			{
@@ -528,6 +531,7 @@ class OnboardingRegistrierungLib
 
 				if (hasData($personLoadRes))
 				{
+					// check for equality - no need to update if no new data coming from onboarding
 					if (!checkEquality(getData($personLoadRes)[0], $personData['person']))
 					{
 						$personRes = $this->_ci->PersonModel->update(
