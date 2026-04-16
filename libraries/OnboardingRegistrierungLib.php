@@ -531,16 +531,21 @@ class OnboardingRegistrierungLib
 
 				if (hasData($personLoadRes))
 				{
-					// check for equality - no need to update if no new data coming from onboarding
-					if (!checkEquality(getData($personLoadRes)[0], $personData['person']))
+					$person = getData($personLoadRes)[0];
+
+					// remove onboarding "default" values, if they are already set in fhcomplete.
+					$personData['person'] = $this->_removeAlreadySetValues($personData['person'], $person);
+
+					// check for changes - no need to update if no new data coming from onboarding
+					if (changesExist($personData['person'], $person))
 					{
 						$personRes = $this->_ci->PersonModel->update(
 							['person_id' => $person_id],
 							array_merge($personData['person'], ['updateamum' => date('Y-m-d H:i:s'), 'updatevon' => self::INSERT_UPDATE_VON])
 						);
-					}
 
-					if (isError($personRes)) $errors[] = getError($personRes);
+						if (isError($personRes)) $errors[] = getError($personRes);
+					}
 				}
 			}
 			else
@@ -604,7 +609,7 @@ class OnboardingRegistrierungLib
 					// update address, if it already exists
 					if (isset($meldeAdresse))
 					{
-						if (!checkEquality($meldeAdresse, $personData['adresse']))
+						if (changesExist($personData['adresse'], $meldeAdresse))
 						{
 							$adresseRes = $this->_ci->AdresseModel->update(
 								['adresse_id' => $meldeAdresse->adresse_id],
@@ -822,5 +827,26 @@ class OnboardingRegistrierungLib
 			$this->_ci->db->trans_commit();
 			return success(['person_id' => $person_id, 'verifikation_code' => $verifikation_code]);
 		}
+	}
+
+	/**
+	 * Removing values which are already set in fhc and therefore should not be set by onboarding.
+	 * @param array $onboardingPerson
+	 * @param object $fhcPerson
+	 * @return object success or error
+	 */
+	private function _removeAlreadySetValues($onboardingPerson, $fhcPerson)
+	{
+		$overwritableValues = ['geschlecht' => OnboardingMappingLib::GESCHLECHT_UNBEKANNT];
+
+		foreach ($overwritableValues as $name => $value)
+		{
+			if (isset($onboardingPerson[$name]) && $onboardingPerson[$name] == $value && isset($fhcPerson->{$name}) && $fhcPerson->{$name} != '')
+			{
+				unset($onboardingPerson[$name]);
+			}
+		}
+
+		return $onboardingPerson;
 	}
 }

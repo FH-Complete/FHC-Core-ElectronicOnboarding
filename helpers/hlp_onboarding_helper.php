@@ -36,12 +36,19 @@ function generateVerificationCode()
 }
 
 // check, if an object and an array are equal (arrayB should not have any different keys or values than objectA)
-function checkEquality($objectA, $arrayB)
+function changesExist($newArray, $existingObject)
 {
-	if (!is_object($objectA) || !is_array($arrayB)) return false;
+	if (!is_array($newArray) || !is_object($existingObject)) return false;
 
-	$arrayA = (array) $objectA;
-	return array_diff($arrayA, array_diff($arrayA, $arrayB)) === $arrayB;
+	foreach ($newArray as $name => $value)
+	{
+		if (isset($existingObject->{$name}) && $existingObject->{$name} !== $value)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // remove empty (null or empty string) from an array
