@@ -557,6 +557,8 @@ class OnboardingRegistrierungLib
 				if (isError($personRes)) $errors[] = getError($personRes);
 
 				$person_id = getData($personRes);
+
+				$this->_writeNotizen($person_id, $personData['person']);
 			}
 
 			if (is_numeric($person_id))
@@ -565,7 +567,11 @@ class OnboardingRegistrierungLib
 				$this->_ci->PersonLogLib->log(
 					$person_id,
 					'Processstate',
-					array('name'=>'Registration','message'=>'Person registered via electronic onboarding'),
+					array(
+						'name'=>'Registration',
+						'message'=>
+							'Person registered via electronic onboarding, transferred fields: '.implode(', ', array_keys($personData['person']))
+					),
 					'bewerbung',
 					'core',
 					null,
@@ -848,5 +854,54 @@ class OnboardingRegistrierungLib
 		}
 
 		return $onboardingPerson;
+	}
+
+	/**
+	 * Write Notizen for transferred onboarding person.
+	 * @param person_id
+	 * @param array onboardingPerson
+	 * @return object success with info
+	 */
+	private function _writeNotizen($person_id, $onboardingPerson)
+	{
+		$errors = [];
+		$added = 0;
+		$this->_ci->load->model('person/Notiz_model', 'NotizModel');
+
+		$missingFields = [
+			'staatsbuergerschaft' =>
+				[
+					'titel' => 'OnboardingStaatsbuergerschaftNichtGesetzt',
+					'text' =>
+						'Staatsbürgerschaft wurde von Electronic Onboarding nicht gesetzt: '
+						.'Dokumente (Reisepass) müssen daher hochgeladen und geprüft werden!'
+				]
+			];
+
+		foreach ($missingFields as $name => $values)
+		{
+			if (!isset($onboardingPerson[$name]) || $onboardingPerson[$name] == '')
+			{
+				$result = $this->_ci->NotizModel->addNotizForPerson(
+					$person_id,
+					$values['titel'],
+					$values['text'],
+					false,
+					null,
+					self::INSERT_UPDATE_VON
+				);
+
+				if (isError($result))
+				{
+					$errors[] = getError($result);
+				}
+				else
+				{
+					$added++;
+				}
+			}
+		}
+
+		return success(['added' => $added, 'errors' => $errors]);
 	}
 }
