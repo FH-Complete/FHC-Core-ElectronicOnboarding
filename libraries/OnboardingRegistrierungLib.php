@@ -558,7 +558,13 @@ class OnboardingRegistrierungLib
 
 				$person_id = getData($personRes);
 
-				$this->_writeNotizen($person_id, $personData['person']);
+				$notizenRes = $this->_writeNotizen($person_id, $personData['person']);
+
+				if (hasData($notizenRes))
+				{
+					$notizenErrors = getData($notizenRes)['errors'];
+					if (!isEmptyArray($errors)) $errors = array_merge($errors, $notizenErrors);
+				}
 			}
 
 			if (is_numeric($person_id))
