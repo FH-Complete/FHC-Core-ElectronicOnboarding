@@ -871,7 +871,7 @@ class OnboardingRegistrierungLib
 		$missingFields = [
 			'staatsbuergerschaft' =>
 				[
-					'titel' => 'OnboardingStaatsbuergerschaftNichtGesetzt',
+					'titel' => 'Anmerkung zur Bewerbung',
 					'text' =>
 						'Staatsbürgerschaft wurde von Electronic Onboarding nicht gesetzt: '
 						.'Dokumente (Reisepass) müssen daher hochgeladen und geprüft werden!'
