@@ -550,8 +550,17 @@ class OnboardingRegistrierungLib
 			}
 			else
 			{
+				// add new person
+				// application tool Zugangscode - for employees to login to check student data
 				$personRes = $this->_ci->PersonModel->insert(
-					array_merge($personData['person'], ['insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_UPDATE_VON])
+					array_merge(
+						$personData['person'],
+						[
+							'zugangscode' => generateApplicationToolZugangscode(),
+							'insertamum' => date('Y-m-d H:i:s'),
+							'insertvon' => self::INSERT_UPDATE_VON
+						]
+					)
 				);
 
 				if (isError($personRes)) $errors[] = getError($personRes);

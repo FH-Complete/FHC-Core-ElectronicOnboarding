@@ -35,6 +35,12 @@ function generateVerificationCode()
 	//return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }
 
+// generate fh complete login code (for possibility for employees to login without onboarding)
+function generateApplicationToolZugangscode()
+{
+	return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
+}
+
 // check, if an object and an array are equal (arrayB should not have any different keys or values than objectA)
 function changesExist($newArray, $existingObject)
 {
