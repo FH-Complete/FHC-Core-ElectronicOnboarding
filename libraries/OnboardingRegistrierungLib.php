@@ -616,11 +616,11 @@ class OnboardingRegistrierungLib
 							{
 								$meldeAdresse = $address;
 							}
-							elseif ($address->zustelladresse == true)
+							if ($address->zustelladresse == true)
 							{
 								$hasZustelladresse = true;
 							}
-							elseif ($address->heimatadresse == true)
+							if ($address->heimatadresse == true)
 							{
 								$hasHeimatadresse = true;
 							}
