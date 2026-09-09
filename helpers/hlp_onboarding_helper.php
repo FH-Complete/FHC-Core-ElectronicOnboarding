@@ -41,14 +41,14 @@ function generateApplicationToolZugangscode()
 	return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }
 
-// check, if an object and an array are equal (arrayB should not have any different keys or values than objectA)
+// check, if an object and an array are equal (newArray should not have any different keys or values than existingObject)
 function changesExist($newArray, $existingObject)
 {
 	if (!is_array($newArray) || !is_object($existingObject)) return false;
 
 	foreach ($newArray as $name => $value)
 	{
-		if (isset($existingObject->{$name}) && $existingObject->{$name} !== $value)
+		if (property_exists($existingObject, $name) && $existingObject->{$name} !== $value)
 		{
 			return true;
 		}

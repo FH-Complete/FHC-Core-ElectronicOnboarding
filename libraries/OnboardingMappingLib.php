@@ -102,10 +102,12 @@ class OnboardingMappingLib
 		if (!isset($onboardingPersonData->person->meldeadresse)) return [];
 
 		$onboardingAddress = $onboardingPersonData->person->meldeadresse;
+
+		// assemble adress: ignore empty, add slashes if necessary
 		$strasse = $onboardingAddress->strasse
 			.(!isset($onboardingAddress->hausnummer) || isEmptyString($onboardingAddress->hausnummer) ? '' : ' '.$onboardingAddress->hausnummer)
-			.(!isset($onboardingAddress->stiege) || isEmptyString($onboardingAddress->stiege) ? '' : '/'.$onboardingAddress->stiege)
-			.(!isset($onboardingAddress->tuer) || isEmptyString($onboardingAddress->tuer) ? '' : '/'.$onboardingAddress->tuer);
+			.(!isset($onboardingAddress->stiege) || isEmptyString($onboardingAddress->stiege) ? '' : ($onboardingAddress->stiege[0] == '/' ? '' : '/').$onboardingAddress->stiege)
+			.(!isset($onboardingAddress->tuer) || isEmptyString($onboardingAddress->tuer) ? '' : ($onboardingAddress->tuer[0] == '/' ? '' : '/').$onboardingAddress->tuer);
 
 		return [
 			'strasse' => $strasse,

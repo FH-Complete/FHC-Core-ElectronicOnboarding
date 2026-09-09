@@ -604,6 +604,7 @@ class OnboardingRegistrierungLib
 					$hasZustelladresse = false;
 					$hasHeimatadresse = false;
 					$meldeAdresse = null;
+					$identicalAdresses = [];
 
 					// get info from address list
 					if (hasData($addressesLoad))
@@ -616,13 +617,22 @@ class OnboardingRegistrierungLib
 							{
 								$meldeAdresse = $address;
 							}
-							if ($address->zustelladresse == true)
+							elseif ($this->_adressesIdentical($personData['adresse'], $address))
 							{
-								$hasZustelladresse = true;
+								// no changes exist, i.e. address is identical, but not a meldeadresse - delete!
+								// it will be replaced by new address
+								$identicalAdresses[] = $address->adresse_id;
 							}
-							if ($address->heimatadresse == true)
+							else
 							{
-								$hasHeimatadresse = true;
+								if ($address->zustelladresse == true)
+								{
+									$hasZustelladresse = true;
+								}
+								if ($address->heimatadresse == true)
+								{
+									$hasHeimatadresse = true;
+								}
 							}
 						}
 					}
@@ -630,13 +640,21 @@ class OnboardingRegistrierungLib
 					// update address, if it already exists
 					if (isset($meldeAdresse))
 					{
-						if (changesExist($personData['adresse'], $meldeAdresse))
+						$personData['adresse'] = array_merge(
+							$personData['adresse'],
+							['zustelladresse' => !$hasZustelladresse, 'heimatadresse' => !$hasHeimatadresse]
+						);
+						if (changesExist(array_merge($personData['adresse']), $meldeAdresse))
 						{
 							$adresseRes = $this->_ci->AdresseModel->update(
 								['adresse_id' => $meldeAdresse->adresse_id],
 								array_merge(
 									$personData['adresse'],
-									['person_id' => $person_id, 'updateamum' => date('Y-m-d H:i:s'), 'updatevon' => self::INSERT_UPDATE_VON]
+									[
+										'person_id' => $person_id,
+										'updateamum' => date('Y-m-d H:i:s'),
+										'updatevon' => self::INSERT_UPDATE_VON
+									]
 								)
 							);
 
@@ -659,6 +677,14 @@ class OnboardingRegistrierungLib
 						);
 
 						if (isError($adresseRes)) $errors[] = getError($adresseRes);
+					}
+
+					// delete identical adresses
+					foreach ($identicalAdresses as $adresse_id)
+					{
+						$delResult = $this->_ci->AdresseModel->delete($adresse_id);
+
+						if (isError($delResult)) $errors[] = getError($adresseRes);
 					}
 				}
 
@@ -918,5 +944,26 @@ class OnboardingRegistrierungLib
 		}
 
 		return success(['added' => $added, 'errors' => $errors]);
+	}
+
+	/**
+	 * Checks, if address array is identical to address object (has same field values)
+	 * @param $addressArr
+	 * @param $addressObj
+	 * @return bool
+	 */
+	private function _adressesIdentical($addressArr, $adressObj)
+	{
+		$fieldsToCheck = ['strasse', 'plz', 'ort', 'nation'];
+
+		foreach ($fieldsToCheck as $field)
+		{
+			if (!isset($adressObj->{$field}) || (isset($addressArr[$field]) && $addressArr[$field] != $adressObj->{$field}))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 }
