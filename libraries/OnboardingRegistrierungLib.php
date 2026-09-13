@@ -903,6 +903,7 @@ class OnboardingRegistrierungLib
 	 */
 	private function _removeAlreadySetValues($onboardingPerson, $fhcPerson)
 	{
+		// overwritable: fhc values have priority over these values
 		$overwritableValues = ['geschlecht' => OnboardingMappingLib::GESCHLECHT_UNBEKANNT];
 
 		foreach ($overwritableValues as $name => $value)
