@@ -35,15 +35,35 @@ function generateVerificationCode()
 	//return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
 }
 
-/**
- *
- * @param
- * @return array
- */
-function checkEquality($objectA, $arrayB)
+// generate fh complete login code (for possibility for employees to login without onboarding)
+function generateApplicationToolZugangscode()
 {
-	if (!is_object($objectA) || !is_array($arrayB)) return false;
+	return substr(md5(openssl_random_pseudo_bytes(20)), 0, 15);
+}
 
-	$arrayA = (array) $objectA;
-	return array_diff($arrayA, array_diff($arrayA, $arrayB)) === $arrayB;
+// check, if an object and an array are equal (newArray should not have any different keys or values than existingObject)
+function changesExist($newArray, $existingObject)
+{
+	if (!is_array($newArray) || !is_object($existingObject)) return false;
+
+	foreach ($newArray as $name => $value)
+	{
+		if (property_exists($existingObject, $name) && $existingObject->{$name} !== $value)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// remove empty (null or empty string) from an array
+function removeEmptyValues($array)
+{
+	foreach ($array as $key => $value)
+	{
+		if ($value == null || $value == '') unset($array[$key]);
+	}
+
+	return $array;
 }

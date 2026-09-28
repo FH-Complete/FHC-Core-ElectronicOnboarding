@@ -15,6 +15,7 @@ class OnboardingMappingLib
 	const EMAIL_UNVERIFIZIERT_KONTAKTTYP = 'email_unverifiziert';
 	const ADRESSE_TYP = 'm';
 	const AUSTRIA_NATION_CODE = 'A';
+	const GESCHLECHT_UNBEKANNT = 'u';
 
 	private $_ci = '';
 
@@ -101,10 +102,12 @@ class OnboardingMappingLib
 		if (!isset($onboardingPersonData->person->meldeadresse)) return [];
 
 		$onboardingAddress = $onboardingPersonData->person->meldeadresse;
+
+		// assemble adress: ignore empty, add slashes if necessary
 		$strasse = $onboardingAddress->strasse
 			.(!isset($onboardingAddress->hausnummer) || isEmptyString($onboardingAddress->hausnummer) ? '' : ' '.$onboardingAddress->hausnummer)
-			.(!isset($onboardingAddress->stiege) || isEmptyString($onboardingAddress->stiege) ? '' : '/'.$onboardingAddress->stiege)
-			.(!isset($onboardingAddress->tuer) || isEmptyString($onboardingAddress->tuer) ? '' : '/'.$onboardingAddress->tuer);
+			.(!isset($onboardingAddress->stiege) || isEmptyString($onboardingAddress->stiege) ? '' : ($onboardingAddress->stiege[0] == '/' ? '' : '/').$onboardingAddress->stiege)
+			.(!isset($onboardingAddress->tuer) || isEmptyString($onboardingAddress->tuer) ? '' : ($onboardingAddress->tuer[0] == '/' ? '' : '/').$onboardingAddress->tuer);
 
 		return [
 			'strasse' => $strasse,
@@ -171,7 +174,7 @@ class OnboardingMappingLib
 
 		return isset($onboardingPerson->geschlecht) && isset($geschlechtMappings[$onboardingPerson->geschlecht])
 			? $geschlechtMappings[$onboardingPerson->geschlecht]
-			: 'u';
+			: self::GESCHLECHT_UNBEKANNT;
 	}
 
 	/**

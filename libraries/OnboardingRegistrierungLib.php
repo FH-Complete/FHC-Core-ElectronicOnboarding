@@ -519,6 +519,9 @@ class OnboardingRegistrierungLib
 
 		if (!isEmptyArray($personData['person']))
 		{
+			// clear onboarding data of empty values (should be ignored, no updates with empty data)
+			$personData['person'] = removeEmptyValues($personData['person']);
+
 			// save person
 			if (is_numeric($person_id))
 			{
@@ -528,26 +531,49 @@ class OnboardingRegistrierungLib
 
 				if (hasData($personLoadRes))
 				{
-					if (!checkEquality(getData($personLoadRes)[0], $personData['person']))
+					$person = getData($personLoadRes)[0];
+
+					// remove onboarding "default" values, if they are already set in fhcomplete.
+					$personData['person'] = $this->_removeAlreadySetValues($personData['person'], $person);
+
+					// check for changes - no need to update if no new data coming from onboarding
+					if (changesExist($personData['person'], $person))
 					{
 						$personRes = $this->_ci->PersonModel->update(
 							['person_id' => $person_id],
 							array_merge($personData['person'], ['updateamum' => date('Y-m-d H:i:s'), 'updatevon' => self::INSERT_UPDATE_VON])
 						);
-					}
 
-					if (isError($personRes)) $errors[] = getError($personRes);
+						if (isError($personRes)) $errors[] = getError($personRes);
+					}
 				}
 			}
 			else
 			{
+				// add new person
+				// application tool Zugangscode - for employees to login to check student data
 				$personRes = $this->_ci->PersonModel->insert(
-					array_merge($personData['person'], ['insertamum' => date('Y-m-d H:i:s'), 'insertvon' => self::INSERT_UPDATE_VON])
+					array_merge(
+						$personData['person'],
+						[
+							'zugangscode' => generateApplicationToolZugangscode(),
+							'insertamum' => date('Y-m-d H:i:s'),
+							'insertvon' => self::INSERT_UPDATE_VON
+						]
+					)
 				);
 
 				if (isError($personRes)) $errors[] = getError($personRes);
 
 				$person_id = getData($personRes);
+
+				$notizenRes = $this->_writeNotizen($person_id, $personData['person']);
+
+				if (hasData($notizenRes))
+				{
+					$notizenErrors = getData($notizenRes)['errors'];
+					if (!isEmptyArray($errors)) $errors = array_merge($errors, $notizenErrors);
+				}
 			}
 
 			if (is_numeric($person_id))
@@ -556,7 +582,11 @@ class OnboardingRegistrierungLib
 				$this->_ci->PersonLogLib->log(
 					$person_id,
 					'Processstate',
-					array('name'=>'Registration','message'=>'Person registered via electronic onboarding'),
+					array(
+						'name'=>'Registration',
+						'message'=>
+							'Person registered via electronic onboarding, transferred fields: '.implode(', ', array_keys($personData['person']))
+					),
 					'bewerbung',
 					'core',
 					null,
@@ -574,6 +604,7 @@ class OnboardingRegistrierungLib
 					$hasZustelladresse = false;
 					$hasHeimatadresse = false;
 					$meldeAdresse = null;
+					$identicalAddresses = [];
 
 					// get info from address list
 					if (hasData($addressesLoad))
@@ -582,53 +613,97 @@ class OnboardingRegistrierungLib
 
 						foreach ($addressesLoadData as $address)
 						{
-							if ($address->typ == OnboardingMappingLib::ADRESSE_TYP)
+							$isMeldeadresse = $address->typ == OnboardingMappingLib::ADRESSE_TYP;
+							if ($this->_adressesIdentical($personData['adresse'], $address) && !$isMeldeadresse)
+							{
+								// no changes exist, i.e. address is identical, but not a meldeadresse - delete!
+								// it will be replaced by new address
+								$identicalAddresses[] = $address->adresse_id;
+								continue;
+							}
+							if ($isMeldeadresse)
 							{
 								$meldeAdresse = $address;
 							}
-							elseif ($address->zustelladresse == true)
+							if ($address->zustelladresse == true)
 							{
 								$hasZustelladresse = true;
 							}
-							elseif ($address->heimatadresse == true)
+							if ($address->heimatadresse == true)
 							{
 								$hasHeimatadresse = true;
 							}
 						}
 					}
 
-					// update address, if it already exists
-					if (isset($meldeAdresse))
+					$insertNewAddress = false;
+					if (isset($meldeAdresse)) // Meldeadresse exists
 					{
-						if (!checkEquality($meldeAdresse, $personData['adresse']))
+						// there have been changes
+						if (changesExist($personData['adresse'], $meldeAdresse))
 						{
+							// if there is an old adress, set to different type
 							$adresseRes = $this->_ci->AdresseModel->update(
-								['adresse_id' => $meldeAdresse->adresse_id],
-								array_merge(
-									$personData['adresse'],
-									['person_id' => $person_id, 'updateamum' => date('Y-m-d H:i:s'), 'updatevon' => self::INSERT_UPDATE_VON]
-								)
+								$meldeAdresse->adresse_id,
+								[
+									'typ' => 'h',
+									'updateamum' => date('Y-m-d H:i:s'),
+									'updatevon' => self::INSERT_UPDATE_VON
+								]
+							);
+
+							if (isError($adresseRes)) $errors[] = getError($adresseRes);
+
+							// update address by inserting it
+							$insertNewAddress = true;
+						}
+						elseif (!$hasHeimatadresse || !$hasZustelladresse)
+						{
+							$updateArr =
+							[
+								'updateamum' => date('Y-m-d H:i:s'),
+								'updatevon' => self::INSERT_UPDATE_VON
+							];
+
+							if (!$hasHeimatadresse) $updateArr['heimatadresse'] = true;
+							if (!$hasZustelladresse) $updateArr['zustelladresse'] = true;
+							// adresse exists, but no heimat/zustelladresse - update!
+							$adresseRes = $this->_ci->AdresseModel->update(
+								$meldeAdresse->adresse_id,
+								$updateArr
 							);
 
 							if (isError($adresseRes)) $errors[] = getError($adresseRes);
 						}
 					}
-					else // insert new, if no Meldeadresse yet
-					{
-						$adresseRes = $this->_ci->AdresseModel->insert(
-							array_merge(
-								$personData['adresse'],
-								[
-									'person_id' => $person_id,
-									'zustelladresse' => !$hasZustelladresse, // mark as Zustelladresse if there is none
-									'heimatadresse' => !$hasHeimatadresse,// mark as Heimatadresse if there is none
-									'insertamum' => date('Y-m-d H:i:s'),
-									'insertvon' => self::INSERT_UPDATE_VON
-								]
-							)
-						);
+					else // no Meldeadresse - add neww
+						$insertNewAddress = true;
 
-						if (isError($adresseRes)) $errors[] = getError($adresseRes);
+						if ($insertNewAddress)
+						{
+							// insert new Meldeadresse (cannot just update old because Heimatadresse cannot change)
+							$adresseRes = $this->_ci->AdresseModel->insert(
+								array_merge(
+									$personData['adresse'],
+									[
+										'person_id' => $person_id,
+										'zustelladresse' => !$hasZustelladresse,
+										'heimatadresse' => !$hasHeimatadresse,
+										'insertamum' => date('Y-m-d H:i:s'),
+										'insertvon' => self::INSERT_UPDATE_VON
+									]
+								)
+							);
+
+							if (isError($adresseRes)) $errors[] = getError($adresseRes);
+						}
+
+					// delete identical adresses
+					foreach ($identicalAddresses as $adresse_id)
+					{
+						$delResult = $this->_ci->AdresseModel->delete($adresse_id);
+
+						if (isError($delResult)) $errors[] = getError($adresseRes);
 					}
 				}
 
@@ -818,5 +893,97 @@ class OnboardingRegistrierungLib
 			$this->_ci->db->trans_commit();
 			return success(['person_id' => $person_id, 'verifikation_code' => $verifikation_code]);
 		}
+	}
+
+	/**
+	 * Removing values which are already set in fhc and therefore should not be set by onboarding.
+	 * @param array $onboardingPerson
+	 * @param object $fhcPerson
+	 * @return object success or error
+	 */
+	private function _removeAlreadySetValues($onboardingPerson, $fhcPerson)
+	{
+		// overwritable: fhc values have priority over these values
+		$overwritableValues = ['geschlecht' => OnboardingMappingLib::GESCHLECHT_UNBEKANNT];
+
+		foreach ($overwritableValues as $name => $value)
+		{
+			if (isset($onboardingPerson[$name]) && $onboardingPerson[$name] == $value && isset($fhcPerson->{$name}) && $fhcPerson->{$name} != '')
+			{
+				unset($onboardingPerson[$name]);
+			}
+		}
+
+		return $onboardingPerson;
+	}
+
+	/**
+	 * Write Notizen for transferred onboarding person.
+	 * @param person_id
+	 * @param array onboardingPerson
+	 * @return object success with info
+	 */
+	private function _writeNotizen($person_id, $onboardingPerson)
+	{
+		$errors = [];
+		$added = 0;
+		$this->_ci->load->model('person/Notiz_model', 'NotizModel');
+
+		$missingFields = [
+			'staatsbuergerschaft' =>
+				[
+					'titel' => 'Anmerkung zur Bewerbung',
+					'text' =>
+						'Staatsbürgerschaft wurde von Electronic Onboarding nicht gesetzt: '
+						.'Dokumente (Reisepass) müssen daher hochgeladen und geprüft werden!'
+				]
+			];
+
+		foreach ($missingFields as $name => $values)
+		{
+			if (!isset($onboardingPerson[$name]) || $onboardingPerson[$name] == '')
+			{
+				$result = $this->_ci->NotizModel->addNotizForPerson(
+					$person_id,
+					$values['titel'],
+					$values['text'],
+					false,
+					null,
+					self::INSERT_UPDATE_VON
+				);
+
+				if (isError($result))
+				{
+					$errors[] = getError($result);
+				}
+				else
+				{
+					$added++;
+				}
+			}
+		}
+
+		return success(['added' => $added, 'errors' => $errors]);
+	}
+
+	/**
+	 * Checks, if address array is identical to address object (has same field values)
+	 * @param $addressArr
+	 * @param $addressObj
+	 * @return bool
+	 */
+	private function _adressesIdentical($addressArr, $adressObj)
+	{
+		$fieldsToCheck = ['strasse', 'plz', 'ort', 'nation'];
+
+		foreach ($fieldsToCheck as $field)
+		{
+			if (!isset($adressObj->{$field}) || (isset($addressArr[$field]) && $addressArr[$field] != $adressObj->{$field}))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 }
